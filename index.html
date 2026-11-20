@@ -92,9 +92,13 @@
         .voice-section { text-align: center; }
         .voice-title { font-family: var(--display); font-size: 19px; font-weight: 700; margin-bottom: 14px; }
         .voice-section > select { margin-bottom: 20px; }
-        .mic-btn { width: 86px; height: 86px; border-radius: 50%; background: var(--mic-green); color: #fff; font-size: 34px; display: flex; align-items: center; justify-content: center; margin: 0 auto;
-            box-shadow: 0 0 0 8px rgba(18, 121, 90, .12), 0 0 0 17px rgba(18, 121, 90, .06); transition: all .35s cubic-bezier(.175, .885, .32, 1.275); }
-        .mic-btn.listening { background: var(--mic-red); border-radius: 26px; transform: scale(.95); animation: pulse-red 1.5s infinite; }
+        .mic-btn { width: 86px; height: 86px; border-radius: 50%; background: var(--mic-green); color: #fff; font-size: 34px; display: flex; align-items: center; justify-content: center; margin: 0 auto; position: relative;
+            box-shadow: 0 0 0 8px rgba(18, 121, 90, .12), 0 0 0 17px rgba(18, 121, 90, .06); transition: background-color .25s, border-radius .35s, transform .35s cubic-bezier(.175, .885, .32, 1.275); }
+        .mic-btn.listening { background: var(--mic-red); border-radius: 26px; transform: scale(.95); }
+        /* نبض خفيف على كارت الرسوميات (transform/opacity) بدل تحريك box-shadow الكبير اللي كان بيتقّل الرسم */
+        .mic-btn.listening::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 3px solid rgba(191, 59, 43, .6); pointer-events: none; will-change: transform, opacity; animation: mic-ring 1.5s ease-out infinite; }
+        @keyframes mic-ring { from { transform: scale(1); opacity: .8; } to { transform: scale(1.45); opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { .mic-btn.listening::after { animation: none; } }
         @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(191, 59, 43, .55); } 70% { box-shadow: 0 0 0 22px rgba(191, 59, 43, 0); } 100% { box-shadow: 0 0 0 0 rgba(191, 59, 43, 0); } }
         .voice-status { margin-top: 24px; font-size: 14px; font-weight: 600; color: var(--primary); padding: 8px 15px; border-radius: 99px; display: inline-flex; align-items: center; gap: 8px; background: rgba(18, 121, 90, .10); }
         .voice-status.recording, .voice-status.error { color: var(--danger); background: rgba(191, 59, 43, .10); }

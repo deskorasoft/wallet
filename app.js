@@ -505,9 +505,10 @@
         }
         updateUI();
     }
-    function saveData() {
+    let uiTimer = 0;
+    function saveData(defer) {
         if (!safeSet(STORAGE_KEY, JSON.stringify(state))) alert(T('saveFail'));
-        updateUI();
+        if (defer) { clearTimeout(uiTimer); requestAnimationFrame(() => { uiTimer = setTimeout(updateUI, 0); }); } else { clearTimeout(uiTimer); updateUI(); }
     }
 
     // ---------- منطق العمليات ----------
@@ -1118,17 +1119,18 @@
     }
     // إزالة التكرار الملاصق: "قهوة 50 قهوة 50" ← "قهوة 50" / "جبت جبت جبت" ← "جبت" (الأرقام المتكررة زي "50 50" بتفضل)
     function dedupeWords(text) {
-        const w = wordsOf(text);
+        const w = wordsOf(text), k = w.map(nw);
         let changed = true;
         while (changed) {
             changed = false;
             for (let n = Math.floor(w.length / 2); n >= 1 && !changed; n--) {
                 for (let i = 0; i + 2 * n <= w.length; i++) {
+                    if (k[i] !== k[i + n]) continue;
                     let same = true;
-                    for (let j = 0; j < n; j++) if (nw(w[i + j]) !== nw(w[i + n + j])) { same = false; break; }
+                    for (let j = 1; j < n; j++) if (k[i + j] !== k[i + n + j]) { same = false; break; }
                     if (!same) continue;
                     if (n === 1 && (/\d/.test(w[i]) || isNumWord(w[i]))) continue;
-                    w.splice(i + n, n); changed = true; break;
+                    w.splice(i + n, n); k.splice(i + n, n); changed = true; break;
                 }
             }
         }
@@ -1176,7 +1178,8 @@
             if (keep && text && ui.salvage) ui.salvage(text);
         };
         r.onstart = () => { running = true; startedAt = Date.now(); if (!r.listening) { r.listening = true; playBeep(900, 0.15); ui.start(); } };
-        r.onresult = (e) => { current = textOfResults(e.results); if (ui.live) ui.live(full()); };
+        let liveRaf = 0;
+        r.onresult = (e) => { current = textOfResults(e.results); if (ui.live && !liveRaf) liveRaf = requestAnimationFrame(() => { liveRaf = 0; if (!done) ui.live(full()); }); };
         r.onerror = (e) => {
             if (e.error === 'no-speech' || e.error === 'aborted') return; // onend هيعيد التشغيل أو ينهي
             if (done) return; done = true; wantOn = false; clearTimers();
@@ -1240,12 +1243,13 @@
         all.slice().forEach((b) => { const s = b.replace(SUF_RE, ''); if (s.length >= 2) all.push(s); });
         return all.some((c) => set.has(c));
     }
-    const STRONG_EXP = mkSet(['صرفت', 'صرفنا', 'دفعت', 'دفعنا', 'شريت', 'شرينا', 'اشتريت', 'اشترينا', 'اشتري', 'سددت', 'مصروف', 'مصاريف', 'خسرت', 'حطيت', 'حاسبت',
+    const STRONG_EXP = mkSet(['صرفت', 'صرفنا', 'دفعت', 'دفعنا', 'شريت', 'شرينا', 'اشتريت', 'اشترينا', 'اشتري', 'سددت', 'مصروف', 'مصاريف', 'خسرت', 'حاسبت',
         'spent', 'paid', 'bought', 'purchased', 'expense', 'buy', 'pay']);
     const WEAK_EXP = mkSet(['جبت', 'جبنا', 'جيبت']);
-    const INC_VERB = mkSet(['قبضت', 'قبضنا', 'قبض', 'اتقبضت', 'استلمت', 'استلمنا', 'استلم', 'جا', 'جات', 'جه', 'جتلي', 'وصلني', 'وصلت', 'حصلت', 'كسبت', 'ربحت', 'رجع', 'رجعو',
+    const INC_VERB = mkSet(['قبضت', 'قبضنا', 'قبض', 'اتقبضت', 'استلمت', 'استلمنا', 'استلم', 'جا', 'جات', 'جه', 'جتلي', 'وصلني', 'وصلت', 'جاء', 'جاءت', 'حصلت', 'كسبت', 'ربحت', 'رجع', 'رجعو',
         'received', 'earned', 'deposit', 'deposited']);
-    const INC_WEAK = mkSet(['اخدت', 'خدت', 'اخدنا', 'اخد']);
+    // أفعال "زيادة فلوس" (ضيف/زود/حطيت…): دخل، إلا لو فيه تصنيف مصروف واضح (حطيت بنزين) أو اسم هدف ادخار (ضيف 200 لهدف السفر)
+    const INC_WEAK = mkSet(['اخدت', 'خدت', 'اخدنا', 'اخد', 'ضيف', 'ضيفت', 'ضفت', 'اضف', 'اضفت', 'اضافه', 'زود', 'زودت', 'زياده', 'حطيت', 'حط', 'ايداع', 'اودعت', 'ودعت']);
     const SALARY_N = mkSet(['مرتب', 'راتب', 'ماهيه', 'شهريه', 'معاش', 'salary', 'paycheck', 'wage', 'wages', 'payroll']);
     const BONUS_N = mkSet(['مكافاه', 'مكافأه', 'بونص', 'عيديه', 'هديه', 'علاوه', 'حافز', 'عموله', 'ربح', 'ارباح', 'ايراد', 'ايرادات', 'bonus', 'gift', 'commission', 'refund', 'profit']);
     const INC_NOUN = mkSet(['دخل', 'income']);
@@ -1375,11 +1379,13 @@
             const hasStrongExp = keepAll.some((w) => stemHit(w, STRONG_EXP));
             const hasSalary = keepAll.some((w) => stemHit(w, SALARY_N));
             const hasIncNoun = hasSalary || keepAll.some((w) => stemHit(w, BONUS_N) || stemHit(w, INC_NOUN));
+            const joinedL = keepAll.join(' ').toLowerCase();
+            const goalHit = state.goals.some((g) => { const k = catKey(g.name); return k && joinedL.includes(k); });
             const isIncome = keepAll.some((w) => stemHit(w, INC_VERB)) || keepAll.some((w) => stemHit(w, INC_NOUN))
                 || (hasIncNoun && !hasStrongExp)
-                || (!hasStrongExp && keepAll.some((w) => stemHit(w, INC_WEAK)) && getCategory(keepAll.join(' ')) === OTHER_CAT); // "اخدت 500 من أحمد" دخل، لكن "اخدت تاكسي 50" مصروف
+                || (!hasStrongExp && !goalHit && keepAll.some((w) => stemHit(w, INC_WEAK)) && getCategory(keepAll.join(' ')) === OTHER_CAT); // "اخدت 500 من أحمد" دخل، لكن "اخدت تاكسي 50" مصروف
             if (isIncome) {
-                const clean = lead(keepAll.filter((w) => !isIncomeVerbW(w) && !stemHit(w, INC_NOUN)).join(' '), idx) || T('voiceIncomeDesc');
+                const clean = lead(keepAll.filter((w) => !isIncomeVerbW(w) && !stemHit(w, INC_NOUN) && !['لي', 'ليا', 'لنا'].includes(nz(w))).join(' '), idx) || T('voiceIncomeDesc');
                 const category = findCustomCat(state.customCats.income, clean) || (hasSalary ? INCOME_CATS[0] : keepAll.some((w) => stemHit(w, BONUS_N)) ? INCOME_CATS[1] : INCOME_CATS[2]);
                 bal[account] = round2(bal[account] + amount);
                 items.push({ type: 'income', amount, account, ts, category, description: clean, shown: clean });
@@ -1387,7 +1393,7 @@
             }
 
             // --- ادخار لهدف: "ادخرت 200 للهدف سفر" / "save 200 to vacation" ---
-            if (state.goals.length && keepAll.some((w) => SAVE_W.has(lw(w)))) {
+            if (state.goals.length && (keepAll.some((w) => SAVE_W.has(lw(w))) || (goalHit && keepAll.some((w) => stemHit(w, INC_WEAK))))) {
                 const joined = keepAll.join(' ').toLowerCase();
                 const g = state.goals.find((x) => { const k = catKey(x.name); return k && joined.includes(k); }) || (state.goals.length === 1 ? state.goals[0] : null);
                 if (g) {
@@ -1427,7 +1433,7 @@
             if (it.goalId) { const g = state.goals.find((x) => x.id === it.goalId); if (g) { const was = g.saved; g.saved = round2(g.saved + it.amount); if (was < g.target && g.saved >= g.target) goalMsg = T('goalReached', g.name); } }
         });
         if (!addedTx.length) return setStatus(T('voiceInsufficient', r.accName), 'error', true);
-        saveData();
+        saveData(true);
         lastCommitted = addedTx;
         let msg = T('voiceDone', addedTx.length), kind = null;
         if (r.rejected > 0) { msg += T('voiceRejected', r.rejected); kind = 'warn'; }
