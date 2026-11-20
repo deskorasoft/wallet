@@ -1575,12 +1575,12 @@
         navigator.serviceWorker.addEventListener('controllerchange', () => { if (window.__wantReload) location.reload(); });
         navigator.serviceWorker.register('sw.js').then((reg) => {
             const offer = (w) => { if (navigator.serviceWorker.controller) showUpdateBanner(w); };
+            const track = (w) => { if (!w) return; if (w.state === 'installed') return offer(w); w.addEventListener('statechange', () => { if (w.state === 'installed') offer(w); }); };
             if (reg.waiting) offer(reg.waiting);
-            reg.addEventListener('updatefound', () => {
-                const w = reg.installing; if (!w) return;
-                w.addEventListener('statechange', () => { if (w.state === 'installed') offer(w); });
-            });
+            track(reg.installing);
+            reg.addEventListener('updatefound', () => track(reg.installing));
             const check = () => { try { reg.update(); } catch (e) {} };
+            check();
             document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
             setInterval(check, 30 * 60 * 1000);
         }).catch((err) => console.log('SW Error', err));
