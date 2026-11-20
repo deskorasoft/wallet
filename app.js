@@ -375,12 +375,32 @@
             ]));
         });
     }
+    // تعارض اسم الحساب مع كلمات بتفهمها الأوامر الصوتية (حساب تاني، كاش/بنك، أوامر، تصنيفات، أهداف)
+    function accNameConflict(name, exceptId) {
+        const seen = new Set();
+        for (const raw of String(name).split(/\s+/)) {
+            const k = nk(raw); if (k.length < 2 || GENERIC_ACC_WORDS.has(k) || seen.has(k)) continue; seen.add(k);
+            const other = state.accounts.find((a) => a.id !== exceptId && accName(a.id).split(/\s+/).map(nk).includes(k));
+            if (other) return { word: raw, why: T('accWhyAcc', accName(other.id)) };
+            if (BANK_ALIASES.map(nk).includes(k) && hasAcc('bank') && exceptId !== 'bank') return { word: raw, why: T('accWhyAlias', accName('bank')) };
+            if (CASH_ALIASES.map(nk).includes(k) && hasAcc('cash') && exceptId !== 'cash') return { word: raw, why: T('accWhyAlias', accName('cash')) };
+            const l = lw(raw);
+            const isCmd = [TRANSFER_W, SAVE_W, TO_W, FROM_W, BY_W].some((s) => s.has(l)) || CURRENCY.includes(l)
+                || [STRONG_EXP, WEAK_EXP, INC_VERB, INC_WEAK, SALARY_N, BONUS_N, INC_NOUN, TRANSFER_S].some((s) => stemHit(raw, s))
+                || isNumWord(raw) || /^(?:امس|امبارح|مبارح|النهارده|اليوم|today|yesterday|ago|days?|ايام|يوم)$/.test(nz(raw));
+            if (isCmd) return { word: raw, why: T('accWhyCmd') };
+            if (getCategory(raw) !== OTHER_CAT || findCustomCat(state.customCats.income, raw)) return { word: raw, why: T('accWhyCat') };
+            if (state.goals.some((g) => catKey(g.name).split(/\s+/).map(nk).includes(k))) return { word: raw, why: T('accWhyGoal') };
+        }
+        return null;
+    }
     function renameAccount(id, input) {
         const a = state.accounts.find((x) => x.id === id); if (!a) return;
         const v = cleanCatName(input.value);
         const revert = () => { input.value = accName(id); };
         if (!v || (v in Object.prototype)) { revert(); return alert(T('accInvalidName')); }
         if (accNameTaken(v, id)) { revert(); return alert(T('accExists')); }
+        if (v !== accName(id)) { const cf = accNameConflict(v, id); if (cf && !confirm(T('accWarn', cf.word, cf.why))) { revert(); return; } }
         input.value = v;
         if (v === accName(id)) return;
         a.name = v; saveData(); toast(T('accRenamed'));
@@ -390,6 +410,7 @@
         if (!v || (v in Object.prototype)) return alert(T('accInvalidName'));
         if (state.accounts.length >= MAX_ACCOUNTS) return alert(T('accLimit'));
         if (accNameTaken(v)) return alert(T('accExists'));
+        { const cf = accNameConflict(v); if (cf && !confirm(T('accWarn', cf.word, cf.why))) return; }
         const rawOpen = $('accOpening').value.trim();
         const opening = rawOpen === '' ? 0 : amt(parseFloat(rawOpen));
         if (!(opening >= 0)) return alert(T('invalidAmount'));
@@ -510,8 +531,19 @@
         if (/كهربا|مية|غاز|نت|فاتورة|فاتوره|تليفون|شحن|\b(?:electricity|water|internet|wifi|bills?|phone|recharge|top.?up)\b/.test(text)) return CATEGORIES[2];
         if (/هدوم|ملابس|جزمة|جزمه|شنطة|شنطه|كوتشي|\b(?:clothes|clothing|shoes?|shirts?|bags?|sneakers|jeans|jacket|dress)\b/.test(text)) return CATEGORIES[3];
         if (/دوا|دكتور|صيدلية|صيدليه|علاج|مستشفى|\b(?:medicine|pharmacy|doctor|hospital|clinic|medical|drugs?|treatment)\b/.test(text)) return CATEGORIES[4];
+        const toks = nw(text).split(/\s+/).map((x) => x.replace(/^ال(?=\S)/, ''));
+        for (const [idx, set] of EGY_CATS) if (toks.some((x) => set.has(x))) return CATEGORIES[idx];
         return OTHER_CAT;
     }
+    // كلمات مصرية إضافية للتصنيف التلقائي (بتتطابق بعد توحيد الهمزات والتاء المربوطة)
+    const mkS = (s) => new Set(s.split(/\s+/).map(nw));
+    const EGY_CATS = [
+        [0, mkS('فطار غدا عشا عشاء سندوتش ساندوتش فول طعميه فلافل كشري شاورما حلويات حلو بقاله مكرونه رز سمك بيض فراخ دليفري ديليفري كافيه نسكافيه بيبسي كولا مياه خبز فاكهه موز تفاح برتقال بطاطس طماطم')],
+        [1, mkS('توكتوك اجره تذكره موقف سواق سايق سولار موتوسيكل جراج سكوتر')],
+        [2, mkS('ايجار نور رصيد اشتراك انترنت ويفاي كهربا غاز فاتوره نت')],
+        [3, mkS('بنطلون قميص تيشرت فستان جاكت حذاء حزام بدله كوتش')],
+        [4, mkS('دواء دوا كشف تحاليل تحليل اشعه روشته فيتامين عياده اسنان نضاره عدسات')]
+    ];
     function addTransaction(t) { t.id = uid(); t.ts = t.ts || Date.now(); state.transactions.push(t); return t; }
 
     // ---------- الفترة ----------
@@ -1069,17 +1101,46 @@
         if (autoReset) statusTimer = setTimeout(() => { voiceTextContent.textContent = DEFAULT_STATUS(); voiceText.classList.remove('error', 'warn'); }, 4500);
     }
     // نص الكلام من كل نتائج الجلسة (مع إزالة التكرار اللي بيحصل في بعض متصفحات الموبايل)
-    const IS_ANDROID = /Android/i.test(navigator.userAgent || '');
+    const wordsOf = (s) => s.split(/\s+/).filter(Boolean);
+    // دمج نتيجة جديدة في قائمة الأجزاء: بتتعامل مع النتايج المتراكمة/المكررة/المعدّلة اللي بترجّعها المتصفحات
+    function mergeInto(parts, t) {
+        if (!parts.length) { parts.push(t); return; }
+        const prev = parts[parts.length - 1], a = wordsOf(prev), b = wordsOf(t);
+        const na = a.map(nw), nb = b.map(nw), ja = ' ' + na.join(' ') + ' ', jb = ' ' + nb.join(' ') + ' ';
+        if (ja.includes(jb) && (nb.length >= 2 || ja === jb)) return;                 // الجديد موجود جوّه القديم: تجاهله
+        if (jb.includes(ja) && na.length >= 2) { parts[parts.length - 1] = t; return; } // القديم جزء من الجديد: استبدله
+        let k = 0; while (k < na.length && k < nb.length && na[k] === nb[k]) k++;
+        if (k && k >= Math.ceil(na.length * 0.6) && nb.length >= k) { parts[parts.length - 1] = nb.length < na.length ? prev : t; return; } // نفس الجملة بتتحسّن
+        for (let o = Math.min(na.length, nb.length); o >= 2; o--) { // آخر القديم = أول الجديد
+            if (na.slice(-o).join(' ') === nb.slice(0, o).join(' ')) { parts[parts.length - 1] = prev + ' ' + b.slice(o).join(' '); return; }
+        }
+        parts.push(t);
+    }
+    // إزالة التكرار الملاصق: "قهوة 50 قهوة 50" ← "قهوة 50" / "جبت جبت جبت" ← "جبت" (الأرقام المتكررة زي "50 50" بتفضل)
+    function dedupeWords(text) {
+        const w = wordsOf(text);
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (let n = Math.floor(w.length / 2); n >= 1 && !changed; n--) {
+                for (let i = 0; i + 2 * n <= w.length; i++) {
+                    let same = true;
+                    for (let j = 0; j < n; j++) if (nw(w[i + j]) !== nw(w[i + n + j])) { same = false; break; }
+                    if (!same) continue;
+                    if (n === 1 && (/\d/.test(w[i]) || isNumWord(w[i]))) continue;
+                    w.splice(i + n, n); changed = true; break;
+                }
+            }
+        }
+        return w.join(' ');
+    }
     function textOfResults(results) {
         const parts = [];
         for (let i = 0; i < results.length; i++) {
-            const t = ((results[i] && results[i][0] && results[i][0].transcript) || '').trim(); if (!t) continue;
-            const prev = parts[parts.length - 1];
-            // أندرويد بس: كل نتيجة بتيجي متراكمة (تحتوي اللي قبلها) فنستبدل بدل ما نكرر. في باقي الأجهزة كل نتيجة جملة مستقلة (ممكن تتكرر فعلاً)
-            if (IS_ANDROID && prev && t.length > prev.length && t.startsWith(prev)) parts[parts.length - 1] = t;
-            else parts.push(t);
+            const t = ((results[i] && results[i][0] && results[i][0].transcript) || '').replace(/\s+/g, ' ').trim();
+            if (t) mergeInto(parts, t);
         }
-        return parts.join(' ');
+        return dedupeWords(parts.join(' '));
     }
     // تسجيل متواصل: المايك بيفضل شغال لحد ما المستخدم يضغط إيقاف (وبيتعاد تشغيله لو المتصفح قفله لوحده)
     const MAX_LISTEN_MS = 180000;
@@ -1088,7 +1149,7 @@
         const r = new SR();
         r.lang = speechLang(); r.continuous = true; r.interimResults = true; r.listening = false;
         let committed = '', current = '', running = false, done = true, wantOn = false, startedAt = 0, quick = 0, restarts = 0, finishTimer = null, maxTimer = null;
-        const full = () => (committed + ' ' + current).replace(/\s+/g, ' ').trim();
+        const full = () => { const p = []; if (committed) p.push(committed); if (current) mergeInto(p, current); return dedupeWords(p.join(' ')).replace(/\s+/g, ' ').trim(); };
         const clearTimers = () => { clearTimeout(finishTimer); clearTimeout(maxTimer); };
         function finalize() {
             if (done) return; done = true; wantOn = false; clearTimers();
@@ -1138,7 +1199,7 @@
         };
         return r;
     }
-    const mainRec = makeRecognizer((t) => processVoiceCommand(t), {
+    const mainRec = makeRecognizer((t) => processVoiceCommand(dedupeWords(wordsToNumbersEn(wordsToNumbers(convertDigits(t))))), {
         start() { micBtn.classList.add('listening'); micBtn.setAttribute('aria-pressed', 'true'); micBtn.textContent = '⏹️'; setStatus(T('recording'), null); voiceTextContent.dataset.rec = '1'; voiceText.classList.add('recording'); },
         stop(r) {
             const was = r.listening; r.listening = false;
@@ -1167,11 +1228,31 @@
     basketMicBtn.addEventListener('click', () => toggleRec(basketRec, mainRec));
 
     // ---------- تنفيذ الأوامر الصوتية/المكتوبة ----------
-    const INCOME_WORDS = ['دخل', 'مرتب', 'راتب', 'قبضت', 'قبض', 'استلمت', 'جالي', 'اخدت', 'أخدت',
-        'income', 'salary', 'received', 'earned', 'deposit', 'bonus', 'paycheck', 'wage', 'wages'];
-    const SALARY_WORDS = ['مرتب', 'راتب', 'salary', 'paycheck', 'wage', 'wages'];
-    const EXPENSE_WORDS = ['صرفت', 'دفعت', 'شريت', 'مصروف', 'اشتريت', 'أشتريت', 'جبت',
-        'spent', 'paid', 'bought', 'purchased', 'expense', 'buy', 'pay'];
+    // مطابقة بالجذر: بتشيل التشكيل والهمزات و"ال" والواو والضمائر الملتصقة (جبتلي، اشتريته، مرتبي، المرتب، جالي، جاني…)
+    const nz = (w) => nw(String(w).toLowerCase());
+    const mkSet = (arr) => new Set(arr.map(nz));
+    const SUF_RE = /(?:لي|لنا|ني|نا|لك|ها|ه|ك|ي)$/;
+    function stemHit(w, set) {
+        const n = nz(w); if (!n) return false;
+        const base = [n]; if (n.length > 3 && n[0] === 'و') base.push(n.slice(1));
+        const all = [];
+        base.forEach((b) => { all.push(b); if (b.length > 3 && b.startsWith('ال')) all.push(b.slice(2)); });
+        all.slice().forEach((b) => { const s = b.replace(SUF_RE, ''); if (s.length >= 2) all.push(s); });
+        return all.some((c) => set.has(c));
+    }
+    const STRONG_EXP = mkSet(['صرفت', 'صرفنا', 'دفعت', 'دفعنا', 'شريت', 'شرينا', 'اشتريت', 'اشترينا', 'اشتري', 'سددت', 'مصروف', 'مصاريف', 'خسرت', 'حطيت', 'حاسبت',
+        'spent', 'paid', 'bought', 'purchased', 'expense', 'buy', 'pay']);
+    const WEAK_EXP = mkSet(['جبت', 'جبنا', 'جيبت']);
+    const INC_VERB = mkSet(['قبضت', 'قبضنا', 'قبض', 'اتقبضت', 'استلمت', 'استلمنا', 'استلم', 'جا', 'جات', 'جه', 'جتلي', 'وصلني', 'وصلت', 'حصلت', 'كسبت', 'ربحت', 'رجع', 'رجعو',
+        'received', 'earned', 'deposit', 'deposited']);
+    const INC_WEAK = mkSet(['اخدت', 'خدت', 'اخدنا', 'اخد']);
+    const SALARY_N = mkSet(['مرتب', 'راتب', 'ماهيه', 'شهريه', 'معاش', 'salary', 'paycheck', 'wage', 'wages', 'payroll']);
+    const BONUS_N = mkSet(['مكافاه', 'مكافأه', 'بونص', 'عيديه', 'هديه', 'علاوه', 'حافز', 'عموله', 'ربح', 'ارباح', 'ايراد', 'ايرادات', 'bonus', 'gift', 'commission', 'refund', 'profit']);
+    const INC_NOUN = mkSet(['دخل', 'income']);
+    const INC_DROP = mkSet(['نزل', 'نزلت']);
+    const TRANSFER_S = mkSet(['حول', 'حولت', 'حولنا', 'تحويل', 'انقل', 'نقلت', 'transfer', 'transferred']);
+    const isIncomeVerbW = (w) => stemHit(w, INC_VERB) || stemHit(w, INC_WEAK) || stemHit(w, INC_DROP);
+    const isExpenseW = (w) => stemHit(w, STRONG_EXP) || stemHit(w, WEAK_EXP);
     const lw = (w) => w.toLowerCase().replace(/[.,!?؟،]/g, '').replace(/[\u064B-\u0652\u0640]/g, '');
 
     // التراجع عن آخر أمر صوتي/مكتوب
@@ -1274,7 +1355,7 @@
             const keepAll = all.filter((_, i) => !drop.has(i));
 
             // --- تحويل بين الحسابات: "حوّل 500 للبنك" / "transfer 200 from bank to cash" ---
-            if (refs.length && state.accounts.length > 1 && all.some((w) => TRANSFER_W.has(lw(w)))) {
+            if (refs.length && state.accounts.length > 1 && all.some((w) => TRANSFER_W.has(lw(w)) || stemHit(w, TRANSFER_S))) {
                 let to = (refs.find((r) => r.role === 'to') || {}).acc, from = (refs.find((r) => r.role === 'from') || {}).acc;
                 if (!to && !from) to = refs[0].acc;
                 // الطرف الغير مذكور: الحساب المختار فوق المايك، أو أول حساب مختلف
@@ -1291,9 +1372,15 @@
             const account = own ? own.acc : (globalAcc || defAcc);
 
             // --- دخل ---
-            if (keepAll.some((w) => INCOME_WORDS.includes(lw(w)))) {
-                const clean = lead(keepAll.filter((w) => lw(w) !== 'دخل' && lw(w) !== 'income').join(' '), idx) || T('voiceIncomeDesc');
-                const category = findCustomCat(state.customCats.income, clean) || (keepAll.some((w) => SALARY_WORDS.includes(lw(w))) ? INCOME_CATS[0] : INCOME_CATS[2]);
+            const hasStrongExp = keepAll.some((w) => stemHit(w, STRONG_EXP));
+            const hasSalary = keepAll.some((w) => stemHit(w, SALARY_N));
+            const hasIncNoun = hasSalary || keepAll.some((w) => stemHit(w, BONUS_N) || stemHit(w, INC_NOUN));
+            const isIncome = keepAll.some((w) => stemHit(w, INC_VERB)) || keepAll.some((w) => stemHit(w, INC_NOUN))
+                || (hasIncNoun && !hasStrongExp)
+                || (!hasStrongExp && keepAll.some((w) => stemHit(w, INC_WEAK)) && getCategory(keepAll.join(' ')) === OTHER_CAT); // "اخدت 500 من أحمد" دخل، لكن "اخدت تاكسي 50" مصروف
+            if (isIncome) {
+                const clean = lead(keepAll.filter((w) => !isIncomeVerbW(w) && !stemHit(w, INC_NOUN)).join(' '), idx) || T('voiceIncomeDesc');
+                const category = findCustomCat(state.customCats.income, clean) || (hasSalary ? INCOME_CATS[0] : keepAll.some((w) => stemHit(w, BONUS_N)) ? INCOME_CATS[1] : INCOME_CATS[2]);
                 bal[account] = round2(bal[account] + amount);
                 items.push({ type: 'income', amount, account, ts, category, description: clean, shown: clean });
                 return;
@@ -1312,7 +1399,7 @@
             }
 
             // --- مصروف ---
-            let base = words.filter((w, i) => !drop.has(i) && !EXPENSE_WORDS.includes(lw(w)));
+            let base = words.filter((w, i) => !drop.has(i) && !isExpenseW(w) && !stemHit(w, INC_WEAK));
             if (!base.length && extra.length) base = extra.filter((w, j) => !drop.has(words.length + j) && w && !STOP_W.includes(lw(w))); // "spent 30 on pizza"
             const clean = lead(base.join(' '), idx) || T('descExpense');
             if (bal[account] < amount) { rejected++; rejAcc = account; return; }
@@ -1463,6 +1550,19 @@
     $('langBtn').addEventListener('click', () => I18N.setLang(L() === 'ar' ? 'en' : 'ar'));
     I18N.onChange(refreshLang);
 
+    // ---------- إشعار التحديث ----------
+    function showUpdateBanner(worker) {
+        if ($('updateBanner')) return;
+        const bar = document.createElement('div'); bar.id = 'updateBanner'; bar.setAttribute('role', 'status');
+        bar.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:9999;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:14px;background:#12795A;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.3);font-weight:600;font-size:14px';
+        const msg = document.createElement('span'); msg.textContent = T('updAvail');
+        const btns = document.createElement('span'); btns.style.cssText = 'display:flex;gap:8px';
+        const mk = (label, primary, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.style.cssText = 'border:0;border-radius:10px;padding:8px 14px;font:inherit;cursor:pointer;' + (primary ? 'background:#fff;color:#12795A' : 'background:rgba(255,255,255,.18);color:#fff'); b.addEventListener('click', fn); return b; };
+        btns.appendChild(mk(T('updLater'), false, () => bar.remove()));
+        btns.appendChild(mk(T('updNow'), true, () => { window.__wantReload = true; try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (e) { location.reload(); } setTimeout(() => location.reload(), 3000); }));
+        bar.appendChild(msg); bar.appendChild(btns); document.body.appendChild(bar);
+    }
+
     // ---------- التشغيل ----------
     updatePinButtons();
     loadData();
@@ -1472,6 +1572,17 @@
     if (pinData) lockApp();
     else if (safeGet(ONBOARD_KEY) !== '1') { safeSet(ONBOARD_KEY, '1'); openModal('modalWelcome'); }
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-        navigator.serviceWorker.register('sw.js').catch((err) => console.log('SW Error', err));
+        navigator.serviceWorker.addEventListener('controllerchange', () => { if (window.__wantReload) location.reload(); });
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+            const offer = (w) => { if (navigator.serviceWorker.controller) showUpdateBanner(w); };
+            if (reg.waiting) offer(reg.waiting);
+            reg.addEventListener('updatefound', () => {
+                const w = reg.installing; if (!w) return;
+                w.addEventListener('statechange', () => { if (w.state === 'installed') offer(w); });
+            });
+            const check = () => { try { reg.update(); } catch (e) {} };
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+            setInterval(check, 30 * 60 * 1000);
+        }).catch((err) => console.log('SW Error', err));
     }
 })();

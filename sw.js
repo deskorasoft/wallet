@@ -1,5 +1,5 @@
 // غيّر رقم الإصدار عند كل تحديث للتطبيق
-const CACHE_NAME = 'wallet-gh-v8';
+const CACHE_NAME = 'wallet-gh-v9';
 const CORE = [
   './',
   './index.html',
@@ -18,8 +18,13 @@ self.addEventListener('install', (e) => {
     const cache = await caches.open(CACHE_NAME);
     // كل ملف لوحده: فشل ملف واحد ما يوقفش التثبيت كله
     await Promise.allSettled([...CORE, ...EXTERNAL].map((url) => cache.add(url)));
-    self.skipWaiting();
+    // أول تثبيت: فعّل فوراً. تحديث: استنى لحد ما المستخدم يضغط "تحديث الآن" (بيبعت SKIP_WAITING)
+    if (!self.registration.active) self.skipWaiting();
   })());
+});
+
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
