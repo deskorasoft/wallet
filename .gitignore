@@ -1,0 +1,4 @@
+# متحطش نسخ احتياطية من بياناتك المالية على GitHub أبداً
+wallet_backup*
+*backup*.json
+*.csv

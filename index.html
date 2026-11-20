@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>محفظتي الذكية — Deskora</title>
+    <meta name="description" content="محفظتي الذكية من Deskora — تتبع مصاريفك ودخلك بالصوت | My Smart Wallet by Deskora — voice-first expense tracker">
+    <meta name="author" content="Deskora">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;700&display=swap" rel="stylesheet">
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#4CAF50">
+
+    <style>
+        :root {
+            --font: 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif;
+            --display: 'Reem Kufi', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+            --bg-color: #EDF1EF; --card-bg: #FFFFFF; --field: #F4F7F6;
+            --text-main: #142320; --text-muted: #667874; --border-color: #DCE4E1;
+            --primary: #12795A; --danger: #BF3B2B; --info: #2F6BDB; --warn: #C98A1B;
+            --cur-str: 'ج.م';
+            --mic-green: radial-gradient(circle at 30% 25%, #1E9B76, #0B4A39);
+            --mic-red: radial-gradient(circle at 30% 25%, #E4553F, #A82A1B);
+        }
+        [data-theme="dark"] {
+            --bg-color: #0C1513; --card-bg: #152320; --field: #1B2D29;
+            --text-main: #E7F0ED; --text-muted: #8FA39E; --border-color: #25372F;
+            --primary: #34B88C; --danger: #EF7A68; --info: #7BA6FF; --warn: #E3AE4A;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { -webkit-text-size-adjust: 100%; }
+        body { font-family: var(--font); background: var(--bg-color); color: var(--text-main); line-height: 1.55;
+            padding: calc(18px + env(safe-area-inset-top)) 14px calc(30px + env(safe-area-inset-bottom));
+            min-height: 100vh; min-height: 100dvh; transition: background-color .25s, color .25s; }
+        button, input, select { font-family: inherit; }
+        :focus-visible { outline: 3px solid rgba(47, 107, 219, .5); outline-offset: 2px; }
+        .container { max-width: 520px; margin: auto; }
+
+        .app-header { display: flex; justify-content: space-between; align-items: center; margin: 4px 2px 18px; }
+        .app-title { font-family: var(--display); font-size: 28px; font-weight: 700; }
+        .theme-btn { background: var(--card-bg); border: 1px solid var(--border-color); font-size: 18px; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; color: var(--text-main); }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 18px; padding: 18px; margin-bottom: 14px; transition: background-color .25s, border-color .25s; }
+
+        button { border: none; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 14px; transition: transform .12s, background-color .2s, opacity .2s; -webkit-tap-highlight-color: transparent; user-select: none; }
+        button:active { transform: scale(.97); }
+
+        /* التنبيهات */
+        .warning-card { background: rgba(201, 138, 27, .12); border: 1px solid rgba(201, 138, 27, .35); color: var(--text-main); padding: 11px 13px; border-radius: 14px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
+        .warning-card .icon { font-size: 18px; line-height: 1.5; }
+        .warning-card p { font-size: 12.5px; font-weight: 500; line-height: 1.65; margin: 0; }
+        .warning-card.backup-due { display: none; background: rgba(191, 59, 43, .10); border-color: rgba(191, 59, 43, .35); flex-direction: column; }
+        .warning-card.backup-due.show { display: flex; }
+        .warning-card.backup-due button { background: var(--danger); color: #fff; padding: 9px 16px; align-self: flex-start; }
+        [data-theme="dark"] .warning-card.backup-due button { color: #1a0d0a; }
+
+        /* الأرصدة: إطار ورقة نقدية */
+        .hero { margin-bottom: 18px; }
+        .accounts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        .account-box { position: relative; overflow: hidden; isolation: isolate; border-radius: 20px; padding: 18px 16px 15px; color: #fff; text-align: start; min-height: 122px; display: flex; flex-direction: column; justify-content: space-between; }
+        .account-box::before { content: ''; position: absolute; inset: 7px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 14px; z-index: -1; pointer-events: none; }
+        .account-box::after { content: var(--cur-str); position: absolute; inset-inline-end: 10px; bottom: -16px; font-family: var(--display); font-size: 74px; font-weight: 700; line-height: 1; color: rgba(255, 255, 255, .08); z-index: -1; pointer-events: none; }
+        .cash-bg { background: repeating-radial-gradient(circle at 108% -12%, rgba(255,255,255,.10) 0 1px, transparent 1px 6px), repeating-radial-gradient(circle at -12% 112%, rgba(255,255,255,.07) 0 1px, transparent 1px 8px), linear-gradient(155deg, #12795A, #093A2D); }
+        .bank-bg { background: repeating-radial-gradient(circle at 108% -12%, rgba(255,255,255,.10) 0 1px, transparent 1px 6px), repeating-radial-gradient(circle at -12% 112%, rgba(255,255,255,.07) 0 1px, transparent 1px 8px), linear-gradient(155deg, #2F52A0, #162A56); }
+        .account-box h3 { font-size: 14px; font-weight: 600; opacity: .88; }
+        .account-box .balance { font-size: clamp(19px, 5.6vw, 25px); font-weight: 700; font-variant-numeric: tabular-nums; word-break: break-word; line-height: 1.3; }
+
+        .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .btn-action { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 13px 6px; border-radius: 16px; background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; font-weight: 600; }
+        .btn-action svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .btn-expense svg { color: var(--danger); } .btn-add svg { color: var(--primary); } .btn-transfer svg { color: var(--info); }
+
+        /* عناوين الأقسام */
+        .basket-header, .history-header { font-family: var(--display); font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .basket-header::after, .history-header::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
+
+        select { width: 100%; padding: 11px 14px; padding-inline-end: 36px; border-radius: 12px; border: 1.5px solid var(--border-color); font-size: 14.5px; font-weight: 500; color: var(--text-main); background-color: var(--field); outline: none; appearance: none; -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23667874' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: left 12px center; }
+        select:focus, input:focus { border-color: var(--primary); }
+        input { color: var(--text-main); }
+
+        /* الصوت */
+        .voice-section { text-align: center; }
+        .voice-title { font-family: var(--display); font-size: 19px; font-weight: 700; margin-bottom: 14px; }
+        .voice-section > select { margin-bottom: 20px; }
+        .mic-btn { width: 86px; height: 86px; border-radius: 50%; background: var(--mic-green); color: #fff; font-size: 34px; display: flex; align-items: center; justify-content: center; margin: 0 auto;
+            box-shadow: 0 0 0 8px rgba(18, 121, 90, .12), 0 0 0 17px rgba(18, 121, 90, .06); transition: all .35s cubic-bezier(.175, .885, .32, 1.275); }
+        .mic-btn.listening { background: var(--mic-red); border-radius: 26px; transform: scale(.95); animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(191, 59, 43, .55); } 70% { box-shadow: 0 0 0 22px rgba(191, 59, 43, 0); } 100% { box-shadow: 0 0 0 0 rgba(191, 59, 43, 0); } }
+        .voice-status { margin-top: 24px; font-size: 14px; font-weight: 600; color: var(--primary); padding: 8px 15px; border-radius: 99px; display: inline-flex; align-items: center; gap: 8px; background: rgba(18, 121, 90, .10); }
+        .voice-status.recording, .voice-status.error { color: var(--danger); background: rgba(191, 59, 43, .10); }
+        .voice-status.warn { color: var(--warn); background: rgba(201, 138, 27, .13); }
+        .recording-dot { width: 10px; height: 10px; background: var(--danger); border-radius: 50%; display: none; }
+        .voice-status.recording .recording-dot { display: block; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .voice-section small { color: var(--text-muted); display: block; margin-top: 14px; font-size: 12.5px; }
+
+        .text-cmd-row, .basket-input-row, .search-row, .budget-form { display: flex; gap: 8px; }
+        .text-cmd-row { margin-top: 18px; }
+        .text-cmd-row input, .basket-input-row input, .search-row input, .budget-form input { flex: 1; min-width: 0; padding: 11px 14px; border-radius: 12px; border: 1.5px solid var(--border-color); font-size: 14.5px; outline: none; background: var(--field); }
+        .text-cmd-row button, .budget-form button { background: var(--primary); color: #fff; padding: 0 18px; }
+        [data-theme="dark"] .text-cmd-row button, [data-theme="dark"] .budget-form button, [data-theme="dark"] .basket-add-btn, [data-theme="dark"] .modal-confirm, [data-theme="dark"] .btn-wide, [data-theme="dark"] .lock-screen .lock-btn { color: #07261c; }
+
+        /* التحليل */
+        .period-row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+        .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .summary div { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border-color); text-align: start; font-size: 12.5px; font-weight: 500; color: var(--text-muted); }
+        .summary span { display: block; font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .summary .inc span { color: var(--primary); } .summary .exp span { color: var(--danger); }
+        .chart-wrapper { display: flex; justify-content: center; align-items: center; min-height: 60px; }
+        .chart-wrapper canvas { max-width: 100%; }
+        .chart-empty-text { color: var(--text-muted); font-weight: 500; font-size: 14px; text-align: center; width: 100%; }
+        .chart-legend { margin-top: 14px; display: flex; flex-direction: column; }
+        .legend-item { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 500; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+        .legend-item:last-child { border-bottom: none; }
+        .legend-item .dot { width: 11px; height: 11px; border-radius: 4px; flex-shrink: 0; }
+        .legend-item .lg-name { flex: 1; }
+        .legend-item .lg-val { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+        /* السلة */
+        .basket-mic-btn { width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; background: var(--mic-green); color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; transition: all .35s cubic-bezier(.175, .885, .32, 1.275); }
+        .basket-mic-btn.listening { background: var(--mic-red); border-radius: 15px; animation: pulse-red 1.5s infinite; }
+        .basket-add-btn { width: 100%; background: var(--primary); color: #fff; padding: 12px; font-size: 15px; margin: 10px 0 8px; }
+        .basket-list { list-style: none; }
+        .basket-item { display: flex; align-items: center; justify-content: space-between; padding: 11px 2px; border-bottom: 1px solid var(--border-color); gap: 8px; }
+        .basket-item:last-child { border-bottom: none; }
+        .basket-item label { display: flex; align-items: center; gap: 12px; width: 100%; cursor: pointer; font-size: 15px; font-weight: 500; }
+        .basket-item input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--primary); flex-shrink: 0; }
+        .basket-item.checked span { text-decoration: line-through; color: var(--text-muted); }
+        .basket-item .delete-btn { background: none; color: var(--text-muted); font-size: 22px; width: 32px; height: 32px; border-radius: 10px; padding: 0; flex-shrink: 0; }
+
+        /* السجل */
+        .search-row select { flex: 0 0 38%; }
+        .history-list { list-style: none; max-height: 380px; overflow-y: auto; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--border-color); gap: 10px; font-size: 14px; }
+        .history-item:last-child { border-bottom: none; }
+        .history-info { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .history-desc { display: flex; align-items: center; gap: 11px; font-weight: 600; word-break: break-word; }
+        .history-desc > span:first-child { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-size: 16px; flex-shrink: 0; background: var(--field); }
+        .history-item.expense .history-desc > span:first-child { background: rgba(191, 59, 43, .12); }
+        .history-item.income .history-desc > span:first-child { background: rgba(18, 121, 90, .14); }
+        .history-item.transfer .history-desc > span:first-child { background: rgba(47, 107, 219, .12); }
+        .history-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding-inline-start: 47px; }
+        .history-category, .chip { font-size: 11px; color: var(--text-muted); background: var(--field); padding: 1px 7px; border-radius: 6px; }
+        .history-date { font-size: 11px; color: var(--text-muted); }
+        .history-side { display: flex; align-items: center; gap: 2px; flex-shrink: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .tx-btn { background: none; font-size: 15px; width: 32px; height: 32px; padding: 0; border-radius: 10px; color: var(--text-muted); }
+        .tx-btn.del { color: var(--danger); font-size: 20px; }
+        .empty-msg { text-align: center; color: var(--text-muted); font-size: 14px; padding: 18px 0; font-weight: 500; }
+
+        /* الميزانية والأهداف والمتكرر */
+        .budget-form { margin-bottom: 16px; }
+        .budget-form select { flex: 1.3; min-width: 0; }
+        .budget-row { margin-bottom: 15px; }
+        .budget-top { display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; font-weight: 600; margin-bottom: 7px; gap: 8px; }
+        .budget-top > span:nth-child(2) { color: var(--text-muted); font-weight: 500; font-variant-numeric: tabular-nums; margin-inline-start: auto; }
+        .budget-top button { background: none; color: var(--text-muted); font-size: 20px; padding: 0 6px; }
+        .goal-btns { display: flex; align-items: center; gap: 4px; }
+        .bar { height: 8px; background: var(--field); border: 1px solid var(--border-color); border-radius: 99px; overflow: hidden; }
+        .bar > i { display: block; height: 100%; background: var(--primary); border-radius: 99px; transition: width .4s; }
+        .bar > i.mid { background: var(--warn); } .bar > i.over { background: var(--danger); }
+        .rec-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 2px; border-bottom: 1px solid var(--border-color); font-size: 14px; font-weight: 600; }
+        .rec-row small { color: var(--text-muted); display: block; font-size: 11.5px; font-weight: 400; }
+        .btn-wide { width: 100%; padding: 12px; background: var(--primary); color: #fff; margin-top: 12px; }
+
+        .backup-btns { display: flex; gap: 10px; }
+        .backup-btns.wrap { flex-wrap: wrap; }
+        .btn-backup { flex: 1 1 45%; padding: 12px 8px; font-size: 13.5px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); }
+        .backup-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+
+        /* النوافذ: ورقة من أسفل الشاشة */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(8, 18, 15, .55); display: none; align-items: flex-end; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
+        .modal-overlay.active { display: flex; }
+        .modal-content { width: 100%; max-width: 520px; background: var(--card-bg); border-radius: 24px 24px 0 0; padding: 12px 18px calc(22px + env(safe-area-inset-bottom)); text-align: start; max-height: 92vh; overflow-y: auto; animation: sheet .24s ease-out; }
+        .modal-content::before { content: ''; display: block; width: 42px; height: 4px; border-radius: 99px; background: var(--border-color); margin: 0 auto 16px; }
+        @keyframes sheet { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+        .modal-title { font-family: var(--display); font-size: 21px; font-weight: 700; margin-bottom: 16px; }
+        .modal-input, .modal-select { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--border-color); font-size: 15.5px; margin-bottom: 12px; background-color: var(--field); color: var(--text-main); outline: none; text-align: start; }
+        .modal-select { padding-inline-end: 36px; }
+        .modal-label { font-size: 12px; color: var(--text-muted); font-weight: 500; margin: -4px 2px 7px; line-height: 1.6; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 4px; }
+        .modal-btn { flex: 1; padding: 13px; border-radius: 13px; font-size: 15px; font-weight: 700; }
+        .modal-confirm { background: var(--primary); color: #fff; }
+        .modal-cancel { background: var(--field); color: var(--text-main); border: 1px solid var(--border-color); }
+
+        #toast { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(30px); background: #14231F; color: #fff; padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .3s; z-index: 3000; max-width: 90%; text-align: center; }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .lock-screen { position: fixed; inset: 0; background: var(--bg-color); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px; text-align: center; }
+        .lock-screen.active { display: flex; }
+        .lock-screen .lock-icon { font-size: 40px; width: 92px; height: 92px; border-radius: 26px; display: grid; place-items: center; color: #fff; background: linear-gradient(155deg, #12795A, #093A2D); box-shadow: inset 0 0 0 6px rgba(255,255,255,.12); }
+        .lock-screen .lock-title { font-family: var(--display); font-size: 26px; font-weight: 700; }
+        .lock-screen input { width: 230px; padding: 14px; font-size: 24px; letter-spacing: 10px; text-align: center; border-radius: 14px; border: 1.5px solid var(--border-color); background: var(--card-bg); outline: none; }
+        .lock-screen .lock-btn { background: var(--primary); color: #fff; padding: 13px 48px; font-size: 16px; }
+        .lock-screen .lock-msg { color: var(--danger); font-weight: 600; min-height: 22px; font-size: 14px; }
+        .lock-screen .lock-forgot { background: none; color: var(--text-muted); font-size: 13px; text-decoration: underline; }
+
+        /* القوائم المنسدلة المخصصة */
+        select { cursor: pointer; }
+        .dd-overlay { position: fixed; inset: 0; background: rgba(8, 18, 15, .5); display: none; align-items: flex-end; justify-content: center; z-index: 1500; backdrop-filter: blur(2px); }
+        .dd-overlay.active { display: flex; }
+        .dd-sheet { width: 100%; max-width: 520px; background: var(--card-bg); border-radius: 24px 24px 0 0; padding: 12px 14px calc(18px + env(safe-area-inset-bottom)); max-height: 70vh; display: flex; flex-direction: column; text-align: start; animation: sheet .22s ease-out; }
+        .dd-sheet::before { content: ''; display: block; flex-shrink: 0; width: 42px; height: 4px; border-radius: 99px; background: var(--border-color); margin: 0 auto 14px; }
+        .dd-title { font-family: var(--display); font-size: 18px; font-weight: 700; margin: 0 6px 10px; flex-shrink: 0; }
+        .dd-list { overflow-y: auto; display: flex; flex-direction: column; gap: 3px; overscroll-behavior: contain; }
+        .dd-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: start; padding: 14px; border-radius: 12px; background: none; color: var(--text-main); font-size: 15.5px; font-weight: 500; }
+        .dd-opt:hover, .dd-opt:focus-visible { background: var(--field); }
+        .dd-opt[aria-selected="true"] { background: rgba(18, 121, 90, .12); color: var(--primary); font-weight: 700; }
+        .dd-opt[aria-selected="true"]::after { content: '✓'; font-weight: 700; }
+
+        @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+    
+        /* دعم الإنجليزية (LTR) / English (LTR) support */
+        html[lang="en"] { --cur-str: 'EGP'; }
+        html[lang="en"] body { --font: 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        html[dir="ltr"] select { background-position: right 12px center; }
+        html[dir="ltr"] .app-title { letter-spacing: .2px; }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+        .lang-btn { background: var(--card-bg); border: 1px solid var(--border-color); height: 42px; min-width: 52px; padding: 0 12px; border-radius: 21px; cursor: pointer; color: var(--text-main); font-size: 13.5px; font-weight: 700; letter-spacing: .3px; }
+        .brand-card { text-align: center; }
+        .brand-card .brand-name { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--primary); }
+        .brand-card p { font-size: 12.5px; color: var(--text-muted); line-height: 1.7; margin-top: 6px; }
+        .brand-card a { display: inline-block; margin-top: 10px; padding: 9px 18px; border-radius: 12px; background: var(--primary); color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; direction: ltr; }
+        [data-theme="dark"] .brand-card a { color: #06231a; }
+    </style>
+</head>
+<body>
+
+<div id="toast" role="status"></div>
+<div class="lock-screen" id="lockScreen">
+    <div class="lock-icon">🔐</div>
+    <div class="lock-title" data-i18n="appName">محفظتي الذكية</div>
+    <input type="password" id="lockInput" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="••••" data-i18n-aria="lockCodeAria" aria-label="رمز القفل">
+    <div class="lock-msg" id="lockMsg"></div>
+    <button class="lock-btn" id="lockBtn" data-i18n="unlock">فتح</button>
+    <button class="lock-forgot" id="lockForgot" data-i18n="forgot">نسيت الرمز؟</button>
+</div>
+
+<div class="container">
+    <div class="app-header">
+        <div class="app-title" data-i18n="appName">محفظتي الذكية</div>
+        <div class="header-actions">
+            <button class="lang-btn" id="langBtn" type="button" aria-label="Switch to English">EN</button>
+            <button class="theme-btn" id="themeBtn" data-i18n-aria="themeAria" aria-label="تبديل الوضع الليلي">🌙</button>
+        </div>
+    </div>
+
+    <div class="warning-card backup-due" id="backupReminder">
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+            <div class="icon">⏰</div>
+            <p id="backupReminderText" data-i18n="backupDue">مر أكثر من أسبوع على آخر نسخة احتياطية. نزّل نسخة جديدة دلوقتي.</p>
+        </div>
+        <button id="backupNowBtn" data-i18n="backupNow">نزّل نسخة الآن</button>
+    </div>
+
+    <div class="warning-card">
+        <div class="icon">⚠️</div>
+        <p data-i18n-html="warnData">تنبيه هام: يتم حفظ البيانات تلقائياً على هذا الجهاز. <b>يرجى عدم مسح بيانات المتصفح (Cookies & Site Data)</b> لتجنب فقدان البيانات. يُنصح بتنزيل نسخة احتياطية بشكل دوري.</p>
+    </div>
+
+    <div class="hero">
+        <div class="accounts">
+            <div class="account-box cash-bg"><h3 data-i18n="cash">كاش</h3><div class="balance" id="cashBalance">0 ج.م</div></div>
+            <div class="account-box bank-bg"><h3 data-i18n="bank">بنك</h3><div class="balance" id="bankBalance">0 ج.م</div></div>
+        </div>
+        <div class="actions">
+            <button class="btn-action btn-expense" id="openExpenseBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg><span data-i18n="expense">مصروف</span></button>
+            <button class="btn-action btn-add" id="openIncomeBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7 7 17M16 17H7V8"/></svg><span data-i18n="income">دخل</span></button>
+            <button class="btn-action btn-transfer" id="openTransferBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg><span data-i18n="transfer">تحويل</span></button>
+        </div>
+    </div>
+
+    <div class="card voice-section">
+        <div class="voice-title" data-i18n="voiceTitle">سجّل بصوتك</div>
+        <select id="accountSelect" data-i18n-aria="account" aria-label="الحساب">
+            <option value="cash" data-i18n="accCash">حساب الكاش</option>
+            <option value="bank" data-i18n="accBank">حساب البنك</option>
+        </select>
+
+        <button class="mic-btn" id="micBtn" data-i18n-aria="micAria" aria-label="تسجيل صوتي">🎙️</button>
+
+        <div>
+            <div id="voiceText" class="voice-status">
+                <span class="recording-dot"></span>
+                <span id="voiceTextContent">اضغط على المايك وابدأ التحدث..</span>
+            </div>
+        </div>
+
+        <div class="text-cmd-row">
+            <input type="text" id="textCmd" placeholder="أو اكتب هنا: قهوة 50 وعصير 20" data-i18n-ph="textCmdPh" data-i18n-aria="textCmdAria" aria-label="كتابة عملية">
+            <button id="textCmdBtn" data-i18n="record">تسجيل</button>
+        </div>
+
+        <small data-i18n="voiceExample">(مثال: قهوة 50 وعصير 20 / دخل 1000 مرتب)</small>
+    </div>
+
+    <div class="card">
+        <div class="history-header" data-i18n="periodSummary">الفترة والملخص</div>
+        <div class="period-row">
+            <select id="periodSelect" data-i18n-aria="period" aria-label="الفترة"></select>
+        </div>
+        <div class="summary">
+            <div class="inc"><span data-i18n="sumIncome">دخل:</span> <span id="sumIncome">0</span></div>
+            <div class="exp"><span data-i18n="sumExpense">مصروف:</span> <span id="sumExpense">0</span></div>
+        </div>
+        <div class="basket-header" data-i18n="analysis">التحليل</div>
+        <div class="period-row">
+            <select id="chartMode" data-i18n-aria="analysisType" aria-label="نوع التحليل">
+                <option value="expense" data-i18n="chartExp">تحليل المصاريف</option>
+                <option value="income" data-i18n="chartInc">تحليل الدخل</option>
+            </select>
+        </div>
+        <div class="chart-wrapper">
+            <div id="chartEmptyText" class="chart-empty-text" style="position:static;transform:none;padding:20px 0;">لا توجد مصاريف لتحليلها بعد</div>
+            <canvas id="expenseChart"></canvas>
+        </div>
+        <div class="chart-legend" id="chartLegend"></div>
+    </div>
+
+    <div class="card">
+        <div class="basket-header" id="budgetTitle">ميزانية الشهر</div>
+        <div class="budget-form">
+            <select id="budgetCat" data-i18n-aria="category" aria-label="التصنيف"></select>
+            <input type="number" id="budgetLimit" inputmode="decimal" min="1" placeholder="الحد (ج.م)" data-i18n-ph="budgetLimitPh">
+            <button id="budgetSaveBtn" data-i18n="save">حفظ</button>
+        </div>
+        <div id="budgetList"></div>
+    </div>
+
+    <div class="card">
+        <div class="basket-header" data-i18n="goalsTitle">أهداف الادخار</div>
+        <div class="budget-form">
+            <input type="text" id="goalName" placeholder="اسم الهدف" maxlength="40" data-i18n-ph="goalNamePh" data-i18n-aria="goalNamePh" aria-label="اسم الهدف">
+            <input type="number" id="goalTarget" inputmode="decimal" min="1" placeholder="المبلغ المستهدف" data-i18n-ph="goalTargetPh">
+            <button id="goalAddBtn" data-i18n="add">إضافة</button>
+        </div>
+        <div id="goalList"></div>
+    </div>
+
+    <div class="card">
+        <div class="basket-header" data-i18n="recurringTitle">عمليات متكررة</div>
+        <div id="recList"></div>
+        <button class="btn-wide" id="recOpenBtn" data-i18n="recAdd">إضافة عملية متكررة</button>
+    </div>
+
+    <div class="card">
+        <div class="basket-header" data-i18n="basketTitle">سلة المشتريات</div>
+        <div class="basket-input-row">
+            <input type="text" id="basketInput" placeholder="أدخل العنصر هنا..." data-i18n-ph="basketPh" data-i18n-aria="basketItemAria" aria-label="عنصر السلة">
+            <button class="basket-mic-btn" id="basketMicBtn" data-i18n-aria="basketMicAria" aria-label="تسجيل صوتي للسلة">🎙️</button>
+        </div>
+        <button class="basket-add-btn" id="basketAddBtn" data-i18n="basketAdd">إضافة للسلة</button>
+        <ul class="basket-list" id="basketList"></ul>
+    </div>
+
+    <div class="card">
+        <div class="history-header" data-i18n="historyTitle">سجل العمليات</div>
+        <div class="search-row">
+            <input type="search" id="searchBox" placeholder="ابحث في السجل" data-i18n-ph="searchPh" data-i18n-aria="searchAria" aria-label="بحث">
+            <select id="typeFilter" data-i18n-aria="type" aria-label="النوع">
+                <option value="all" data-i18n="all">الكل</option>
+                <option value="expense" data-i18n="expense">مصروف</option>
+                <option value="income" data-i18n="income">دخل</option>
+                <option value="transfer" data-i18n="transfer">تحويل</option>
+            </select>
+        </div>
+        <ul class="history-list" id="historyList"></ul>
+    </div>
+
+    <div class="card backup-section">
+        <div class="basket-header" data-i18n="backupSection">النسخ والأمان</div>
+        <div class="backup-btns wrap">
+            <button class="btn-backup" id="exportBtn" data-i18n="exportBtn">تنزيل نسخة</button>
+            <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+            <button class="btn-backup" id="importBtn" data-i18n="importBtn">استرجاع نسخة</button>
+            <button class="btn-backup" id="csvBtn" data-i18n="csvBtn">تصدير CSV</button>
+            <button class="btn-backup" id="pinBtn">رمز القفل</button>
+        </div>
+        <div class="backup-btns" style="margin-top:10px;"><button class="btn-backup" id="pinRemoveBtn" style="display:none" data-i18n="pinRemove">إزالة رمز القفل</button></div>
+        <div class="backup-note" id="lastBackupNote"></div>
+        <div class="backup-note" id="persistNote"></div>
+    </div>
+
+    <div class="card brand-card">
+        <div class="brand-name">Deskora</div>
+        <p data-i18n="brandText">محفظتي الذكية من Deskora — تطبيق سهل الاستخدام يعمل بالكامل بالصوت ودون الحاجة إلى استخدام اليدين. هذه نسخة مبسّطة، وللحصول على النسخة الاحترافية يُرجى التواصل معنا عبر البريد الإلكتروني:</p>
+        <a href="mailto:deskora.software@gmail.com" rel="noopener noreferrer">deskora.software@gmail.com</a>
+    </div>
+</div>
+
+<!-- نافذة إضافة مصروف/دخل -->
+<div class="modal-overlay" id="modalTx">
+    <div class="modal-content">
+        <div class="modal-title" id="txTitle">إضافة مصروف</div>
+        <select id="txAccount" class="modal-select">
+            <option value="cash" data-i18n="accCashE">💵 حساب الكاش</option>
+            <option value="bank" data-i18n="accBankE">🏦 حساب البنك</option>
+        </select>
+        <input type="number" id="txAmount" class="modal-input" inputmode="decimal" min="0" placeholder="المبلغ" data-i18n-ph="amount">
+        <input type="text" id="txDesc" class="modal-input" maxlength="80" placeholder="الوصف (اختياري)" data-i18n-ph="descOpt">
+        <select id="txCat" class="modal-select"></select>
+        <div class="modal-label" data-i18n="dateTime">التاريخ والوقت</div>
+        <input type="datetime-local" id="txDate" class="modal-input">
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="txConfirmBtn" data-i18n="add">إضافة</button>
+            <button class="modal-btn modal-cancel" data-close="modalTx" data-i18n="cancel">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة التحويل -->
+<div class="modal-overlay" id="modalTransfer">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="transferTitle">تحويل بين الحسابات</div>
+        <select id="transFrom" class="modal-select">
+            <option value="cash" data-i18n="fromCashE">من: 💵 حساب الكاش</option>
+            <option value="bank" data-i18n="fromBankE">من: 🏦 حساب البنك</option>
+        </select>
+        <select id="transTo" class="modal-select">
+            <option value="bank" data-i18n="toBankE">إلى: 🏦 حساب البنك</option>
+        </select>
+        <input type="number" id="transAmount" class="modal-input" inputmode="decimal" min="0" placeholder="أدخل المبلغ هنا..." data-i18n-ph="transAmountPh">
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="transConfirmBtn" data-i18n="transfer">تحويل</button>
+            <button class="modal-btn modal-cancel" data-close="modalTransfer" data-i18n="cancel">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تعديل عملية -->
+<div class="modal-overlay" id="modalEdit">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="editTitle">تعديل العملية</div>
+        <input type="text" id="editDesc" class="modal-input" placeholder="الوصف" maxlength="80" data-i18n-ph="desc">
+        <select id="editCat" class="modal-select"></select>
+        <select id="editAccount" class="modal-select"></select>
+        <input type="number" id="editAmount" class="modal-input" inputmode="decimal" min="0" placeholder="المبلغ" data-i18n-ph="amount">
+        <div class="modal-label" data-i18n="dateTime">التاريخ والوقت</div>
+        <input type="datetime-local" id="editDate" class="modal-input">
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="editConfirmBtn" data-i18n="save">حفظ</button>
+            <button class="modal-btn modal-cancel" data-close="modalEdit" data-i18n="cancel">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إضافة مبلغ لهدف ادخار -->
+<div class="modal-overlay" id="modalGoal">
+    <div class="modal-content">
+        <div class="modal-title" id="goalModalTitle">إضافة للهدف</div>
+        <input type="number" id="goalAmt" class="modal-input" inputmode="decimal" min="0" placeholder="المبلغ" data-i18n-ph="amount">
+        <select id="goalAcc" class="modal-select">
+            <option value="none" data-i18n="goalAccNone">بدون خصم من أي حساب</option>
+            <option value="cash" data-i18n="goalAccCash">اخصم من 💵 الكاش</option>
+            <option value="bank" data-i18n="goalAccBank">اخصم من 🏦 البنك</option>
+        </select>
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="goalConfirmBtn" data-i18n="add">إضافة</button>
+            <button class="modal-btn modal-cancel" data-close="modalGoal" data-i18n="cancel">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة عملية متكررة -->
+<div class="modal-overlay" id="modalRec">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="recModalTitle">عملية متكررة شهرياً</div>
+        <select id="recType" class="modal-select">
+            <option value="expense" data-i18n="recTypeExp">➖ مصروف (إيجار، اشتراك...)</option>
+            <option value="income" data-i18n="recTypeInc">➕ دخل (مرتب...)</option>
+        </select>
+        <input type="text" id="recDesc" class="modal-input" maxlength="80" placeholder="الوصف (مثال: إيجار)" data-i18n-ph="recDescPh">
+        <input type="number" id="recAmount" class="modal-input" inputmode="decimal" min="0" placeholder="المبلغ" data-i18n-ph="amount">
+        <select id="recCat" class="modal-select"></select>
+        <select id="recAcc" class="modal-select">
+            <option value="cash" data-i18n="accCashE">💵 حساب الكاش</option>
+            <option value="bank" data-i18n="accBankE">🏦 حساب البنك</option>
+        </select>
+        <div class="modal-label" data-i18n="recDayLabel">يوم الشهر (من 1 إلى 28) — يبدأ من أقرب موعد قادم</div>
+        <input type="number" id="recDay" class="modal-input" inputmode="numeric" min="1" max="28" value="1">
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="recConfirmBtn" data-i18n="save">حفظ</button>
+            <button class="modal-btn modal-cancel" data-close="modalRec" data-i18n="cancel">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تسجيل عنصر السلة كمصروف -->
+<div class="modal-overlay" id="modalBasketPay">
+    <div class="modal-content">
+        <div class="modal-title" id="bpTitle" data-i18n="bpTitleDefault">سجّله كمصروف؟</div>
+        <input type="number" id="bpAmount" class="modal-input" inputmode="decimal" min="0" placeholder="السعر" data-i18n-ph="pricePh">
+        <select id="bpAcc" class="modal-select">
+            <option value="cash" data-i18n="accCashE">💵 حساب الكاش</option>
+            <option value="bank" data-i18n="accBankE">🏦 حساب البنك</option>
+        </select>
+        <select id="bpCat" class="modal-select"></select>
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="bpConfirmBtn" data-i18n="record">تسجيل</button>
+            <button class="modal-btn modal-cancel" id="bpSkipBtn" data-i18n="skip">تخطي</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة رمز القفل -->
+<div class="modal-overlay" id="modalPin">
+    <div class="modal-content">
+        <div class="modal-title" id="pinTitle">رمز القفل</div>
+        <input type="password" id="pinOld" class="modal-input" inputmode="numeric" maxlength="8" placeholder="الرمز الحالي" data-i18n-ph="pinOldPh" autocomplete="off">
+        <input type="password" id="pinNew" class="modal-input" inputmode="numeric" maxlength="8" placeholder="الرمز الجديد (4 إلى 8 أرقام)" data-i18n-ph="pinNewPh" autocomplete="off">
+        <input type="password" id="pinNew2" class="modal-input" inputmode="numeric" maxlength="8" placeholder="أعد كتابة الرمز" data-i18n-ph="pinNew2Ph" autocomplete="off">
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="pinConfirmBtn" data-i18n="save">حفظ</button>
+            <button class="modal-btn modal-cancel" data-close="modalPin" data-i18n="cancel">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة النسخة الاحتياطية -->
+<div class="modal-overlay" id="modalBackup">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="bkTitle">نسخة احتياطية</div>
+        <input type="password" id="bkPass" class="modal-input" placeholder="كلمة سر للتشفير (اختياري)" data-i18n-ph="bkPassPh" autocomplete="new-password">
+        <div class="modal-label" data-i18n="bkNote">اتركها فاضية لنسخة عادية. لو كتبت كلمة سر هتحتاجها وقت الاسترجاع، ومفيش طريقة لاسترجاعها لو نسيتها.</div>
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="bkDownloadBtn" data-i18n="bkDownload">⬇️ تنزيل</button>
+            <button class="modal-btn modal-confirm" id="bkShareBtn" style="display:none" data-i18n="bkShare">📤 مشاركة</button>
+        </div>
+        <button class="modal-btn modal-cancel" data-close="modalBackup" style="width:100%;margin-top:10px;" data-i18n="cancel">إلغاء</button>
+    </div>
+</div>
+
+<!-- نافذة كلمة سر الاسترجاع -->
+<div class="modal-overlay" id="modalImportPw">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="impTitle">النسخة مشفّرة 🔒</div>
+        <input type="password" id="impPass" class="modal-input" placeholder="كلمة السر" data-i18n-ph="impPassPh" autocomplete="off">
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="impConfirmBtn" data-i18n="decrypt">فك التشفير</button>
+            <button class="modal-btn modal-cancel" data-close="modalImportPw" data-i18n="cancel">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

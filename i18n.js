@@ -1,0 +1,220 @@
+/* محفظتي الذكية — Deskora | My Smart Wallet — Deskora
+ * طبقة الترجمة (عربي / English). تُحمَّل قبل app.js
+ * Translation layer (Arabic / English). Loaded before app.js */
+(function () {
+    'use strict';
+
+    const DICT = {
+        ar: {
+            appName: 'محفظتي الذكية', pageTitle: 'محفظتي الذكية — Deskora',
+            langBtn: 'EN', langBtnAria: 'Switch to English',
+            lockCodeAria: 'رمز القفل', unlock: 'فتح', forgot: 'نسيت الرمز؟',
+            themeAria: 'تبديل الوضع الليلي',
+            backupDue: 'مر أكثر من أسبوع على آخر نسخة احتياطية. نزّل نسخة جديدة دلوقتي.', backupNow: 'نزّل نسخة الآن',
+            warnData: 'تنبيه هام: يتم حفظ البيانات تلقائياً على هذا الجهاز. <b>يرجى عدم مسح بيانات المتصفح (Cookies & Site Data)</b> لتجنب فقدان البيانات. يُنصح بتنزيل نسخة احتياطية بشكل دوري.',
+            cash: 'كاش', bank: 'بنك', expense: 'مصروف', income: 'دخل', transfer: 'تحويل',
+            voiceTitle: 'سجّل بصوتك', account: 'الحساب', accCash: 'حساب الكاش', accBank: 'حساب البنك',
+            accCashE: '💵 حساب الكاش', accBankE: '🏦 حساب البنك', micAria: 'تسجيل صوتي',
+            voiceDefault: 'اضغط على المايك وابدأ التحدث..',
+            textCmdPh: 'أو اكتب هنا: قهوة 50 وعصير 20', textCmdAria: 'كتابة عملية', record: 'تسجيل',
+            voiceExample: '(مثال: قهوة 50 وعصير 20 / دخل 1000 مرتب)',
+            periodSummary: 'الفترة والملخص', period: 'الفترة', allPeriods: 'كل الفترات',
+            sumIncome: 'دخل:', sumExpense: 'مصروف:',
+            analysis: 'التحليل', analysisType: 'نوع التحليل', chartExp: 'تحليل المصاريف', chartInc: 'تحليل الدخل',
+            noExpensesChart: 'لا توجد مصاريف لتحليلها بعد', noIncomeChart: 'لا يوجد دخل لتحليله بعد', chartTotal: 'الإجمالي',
+            category: 'التصنيف', budgetLimitPh: 'الحد (ج.م)', save: 'حفظ',
+            budgetOf: 'ميزانية {0}', noBudget: 'لم تحدد ميزانية بعد (الحد بيتطبق على كل شهر)', delBudget: 'حذف الميزانية',
+            invalidLimit: 'يرجى إدخال حد صحيح!', overBudget: 'تخطيت ميزانية {0}', nearBudget: 'قربت توصل لحد {0}',
+            goalsTitle: 'أهداف الادخار', goalNamePh: 'اسم الهدف', goalTargetPh: 'المبلغ المستهدف', add: 'إضافة',
+            goalDefault: 'هدف', noGoals: 'لا توجد أهداف بعد', addAmount: 'إضافة مبلغ', delGoal: 'حذف الهدف',
+            addToGoal: 'إضافة للهدف', addToGoalName: 'إضافة إلى: {0}',
+            delGoalConfirm: 'حذف الهدف؟ (العمليات المسجلة هتفضل في السجل)', goalNeedBoth: 'اكتب اسم الهدف والمبلغ المستهدف.',
+            savingDesc: 'ادخار: {0}', goalReached: '🎉 مبروك! حققت هدف «{0}»',
+            goalAccNone: 'بدون خصم من أي حساب', goalAccCash: 'اخصم من 💵 الكاش', goalAccBank: 'اخصم من 🏦 البنك',
+            recurringTitle: 'عمليات متكررة', recAdd: 'إضافة عملية متكررة', noRec: 'لا توجد عمليات متكررة',
+            recLine: 'يوم {0} من كل شهر — {1} — {2}', delRecConfirm: 'حذف العملية المتكررة؟', recNeedBoth: 'اكتب الوصف والمبلغ.',
+            recProcessed: 'تم تسجيل {0} عملية متكررة', negSuffix: ' — ⚠️ رصيد بالسالب',
+            recModalTitle: 'عملية متكررة شهرياً', recTypeExp: '➖ مصروف (إيجار، اشتراك...)', recTypeInc: '➕ دخل (مرتب...)',
+            recDescPh: 'الوصف (مثال: إيجار)', recDayLabel: 'يوم الشهر (من 1 إلى 28) — يبدأ من أقرب موعد قادم', type: 'النوع',
+            basketTitle: 'سلة المشتريات', basketPh: 'أدخل العنصر هنا...', basketItemAria: 'عنصر السلة',
+            basketMicAria: 'تسجيل صوتي للسلة', basketAdd: 'إضافة للسلة', basketEmpty: 'السلة فارغة',
+            bpTitleDefault: 'سجّله كمصروف؟', bpTitleItem: 'اشتريت «{0}»؟ سجّله كمصروف', pricePh: 'السعر', skip: 'تخطي',
+            bpNeedPrice: 'اكتب السعر أو اضغط تخطي.',
+            historyTitle: 'سجل العمليات', searchPh: 'ابحث في السجل', searchAria: 'بحث', all: 'الكل',
+            noMatches: 'لا نتائج مطابقة', noTx: 'لا توجد عمليات بعد', edit: 'تعديل', del: 'حذف',
+            cashToBank: 'كاش ← بنك', bankToCash: 'بنك ← كاش', transferTo: 'تحويل إلى {0}',
+            delNegConfirm: 'حذف هذه العملية هيخلّي رصيد أحد الحسابات بالسالب. هل تريد المتابعة؟',
+            delConfirm: 'هل أنت متأكد من حذف هذه العملية؟',
+            backupSection: 'النسخ والأمان', exportBtn: 'تنزيل نسخة', importBtn: 'استرجاع نسخة', csvBtn: 'تصدير CSV',
+            pinBtn: 'رمز القفل', pinChange: 'تغيير رمز القفل', pinRemove: 'إزالة رمز القفل', pinSetTitle: 'تعيين رمز قفل',
+            txAddExpense: 'إضافة مصروف', txAddIncome: 'إضافة دخل', amount: 'المبلغ', descOpt: 'الوصف (اختياري)',
+            desc: 'الوصف', dateTime: 'التاريخ والوقت', cancel: 'إلغاء',
+            descExpense: 'مصروف', descManual: 'إضافة رصيد يدوي',
+            invalidAmount: 'يرجى إدخال مبلغ صحيح!', insufficient: 'الرصيد في هذا الحساب غير كافٍ!',
+            transferTitle: 'تحويل بين الحسابات', fromCashE: 'من: 💵 حساب الكاش', fromBankE: 'من: 🏦 حساب البنك',
+            toBankE: 'إلى: 🏦 حساب البنك', toCashE: 'إلى: 💵 حساب الكاش', transAmountPh: 'أدخل المبلغ هنا...',
+            transFrom: 'التحويل من', transTo: 'التحويل إلى', transferInvalid: 'المبلغ غير كافي أو غير صحيح!',
+            editTitle: 'تعديل العملية', editCashToBank: 'من الكاش إلى البنك', editBankToCash: 'من البنك إلى الكاش',
+            editNeg: 'التعديل هيخلّي الرصيد بالسالب!',
+            pinOldPh: 'الرمز الحالي', pinNewPh: 'الرمز الجديد (4 إلى 8 أرقام)', pinNew2Ph: 'أعد كتابة الرمز',
+            tryAfter: 'حاول بعد {0} ثانية', tooMany: 'محاولات كتير. استنى {0} ثانية.', wrongPin: 'الرمز غير صحيح',
+            forgotInfo: 'الرمز بيحمي الواجهة من الاستخدام العابر بس. لو نسيته: امسح بيانات الموقع من إعدادات المتصفح ثم استرجع من نسخة احتياطية.',
+            pinOldWrong: 'الرمز الحالي غير صحيح', pinRemoved: 'تم إزالة رمز القفل', pinFormat: 'الرمز لازم يكون من 4 إلى 8 أرقام',
+            pinMismatch: 'الرمزان غير متطابقين', pinSet: 'تم تعيين رمز القفل 🔐',
+            bkTitle: 'نسخة احتياطية', bkPassPh: 'كلمة سر للتشفير (اختياري)',
+            bkNote: 'اتركها فاضية لنسخة عادية. لو كتبت كلمة سر هتحتاجها وقت الاسترجاع، ومفيش طريقة لاسترجاعها لو نسيتها.',
+            bkDownload: '⬇️ تنزيل', bkShare: '📤 مشاركة',
+            impTitle: 'النسخة مشفّرة 🔒', impPassPh: 'كلمة السر', decrypt: 'فك التشفير',
+            cryptoNeedHttps: 'التشفير يحتاج فتح التطبيق عبر HTTPS.', decryptNeedHttps: 'فك التشفير يحتاج فتح التطبيق عبر HTTPS.',
+            shareTitle: 'نسخة محفظتي', backupFail: 'تعذّر إنشاء النسخة.', saveFail: 'تعذّر حفظ البيانات! المساحة ممتلئة أو التخزين غير متاح. نزّل نسخة احتياطية الآن.',
+            csvDate: 'التاريخ', csvType: 'النوع', csvDesc: 'الوصف', csvCat: 'التصنيف', csvAcc: 'الحساب', csvAmount: 'المبلغ',
+            csvCashBank: 'كاش←بنك', csvBankCash: 'بنك←كاش',
+            invalidFile: 'الملف غير صالح!', fileTooBig: 'الملف كبير جداً!',
+            importConfirm: 'سيتم استبدال بياناتك الحالية بالنسخة المستوردة ({0} عملية). هل تريد المتابعة؟',
+            restored: 'تم استرجاع البيانات بنجاح! ✅', wrongPass: 'كلمة السر غلط أو الملف تالف.',
+            lastBackup: 'آخر نسخة احتياطية: {0}', noBackupYet: 'لم يتم تنزيل نسخة احتياطية بعد',
+            persistOk: '🔒 التخزين محمي من المسح التلقائي',
+            persistNo: 'ℹ️ المتصفح لم يؤكد حماية التخزين — يُفضل تثبيت التطبيق ونسخ احتياطي دوري',
+            recording: 'جاري التسجيل... تحدث الآن',
+            micDenied: 'تم رفض إذن الميكروفون. اسمح للمتصفح باستخدام المايك من إعدادات الموقع.',
+            micNetwork: 'مشكلة في الشبكة. تأكد من اتصال الإنترنت (التعرف الصوتي يحتاج نت).',
+            micNone: 'لم يتم العثور على ميكروفون.', micNoSpeech: 'لم أسمع شيئاً، حاول مرة أخرى.', micError: 'حدث خطأ في المايك: {0}',
+            noSpeechSupport: 'المتصفح لا يدعم التسجيل الصوتي. اكتب العملية في الخانة تحت.', noSpeechAlert: 'المتصفح لا يدعم التسجيل الصوتي.',
+            voiceIncomeDesc: 'دخل بالصوت', voiceDone: 'تم تسجيل {0} عملية! ✅', voiceRejected: ' (تعذّر {0} لعدم كفاية الرصيد)',
+            voiceInsufficient: 'الرصيد في حساب {0} غير كافٍ لهذه العملية.', voiceNoAmount: 'لم يتم التعرف على المبلغ. حاول مرة أخرى.',
+            cur: 'ج.م', choose: 'اختر',
+            brandText: 'محفظتي الذكية من Deskora — تطبيق سهل الاستخدام يعمل بالكامل بالصوت ودون الحاجة إلى استخدام اليدين. هذه نسخة مبسّطة، وللحصول على النسخة الاحترافية يُرجى التواصل معنا عبر البريد الإلكتروني:',
+            notFound: 'الصفحة غير موجودة'
+        },
+        en: {
+            appName: 'My Smart Wallet', pageTitle: 'My Smart Wallet — Deskora',
+            langBtn: 'عربي', langBtnAria: 'التبديل إلى العربية',
+            lockCodeAria: 'Lock code', unlock: 'Unlock', forgot: 'Forgot code?',
+            themeAria: 'Toggle dark mode',
+            backupDue: 'It has been over a week since your last backup. Download a new one now.', backupNow: 'Download backup now',
+            warnData: 'Important: your data is saved automatically on this device. <b>Please do not clear your browser data (Cookies & Site Data)</b> to avoid losing it. Downloading a backup regularly is recommended.',
+            cash: 'Cash', bank: 'Bank', expense: 'Expense', income: 'Income', transfer: 'Transfer',
+            voiceTitle: 'Record with your voice', account: 'Account', accCash: 'Cash account', accBank: 'Bank account',
+            accCashE: '💵 Cash account', accBankE: '🏦 Bank account', micAria: 'Voice recording',
+            voiceDefault: 'Tap the mic and start speaking..',
+            textCmdPh: 'Or type here: coffee 50 and juice 20', textCmdAria: 'Type a transaction', record: 'Add',
+            voiceExample: '(e.g. coffee 50 and juice 20 / income 1000 salary)',
+            periodSummary: 'Period & summary', period: 'Period', allPeriods: 'All periods',
+            sumIncome: 'Income:', sumExpense: 'Expenses:',
+            analysis: 'Analysis', analysisType: 'Analysis type', chartExp: 'Expense analysis', chartInc: 'Income analysis',
+            noExpensesChart: 'No expenses to analyze yet', noIncomeChart: 'No income to analyze yet', chartTotal: 'Total',
+            category: 'Category', budgetLimitPh: 'Limit', save: 'Save',
+            budgetOf: 'Budget – {0}', noBudget: 'No budget set yet (the limit applies to every month)', delBudget: 'Delete budget',
+            invalidLimit: 'Please enter a valid limit!', overBudget: 'You exceeded the {0} budget', nearBudget: 'You are close to the {0} limit',
+            goalsTitle: 'Savings goals', goalNamePh: 'Goal name', goalTargetPh: 'Target', add: 'Add',
+            goalDefault: 'Goal', noGoals: 'No goals yet', addAmount: 'Add amount', delGoal: 'Delete goal',
+            addToGoal: 'Add to goal', addToGoalName: 'Add to: {0}',
+            delGoalConfirm: 'Delete this goal? (Recorded transactions will stay in the history)', goalNeedBoth: 'Enter the goal name and the target amount.',
+            savingDesc: 'Savings: {0}', goalReached: '🎉 Congratulations! You reached your goal “{0}”',
+            goalAccNone: 'Don’t deduct from any account', goalAccCash: 'Deduct from 💵 Cash', goalAccBank: 'Deduct from 🏦 Bank',
+            recurringTitle: 'Recurring transactions', recAdd: 'Add recurring transaction', noRec: 'No recurring transactions',
+            recLine: 'Day {0} of every month — {1} — {2}', delRecConfirm: 'Delete this recurring transaction?', recNeedBoth: 'Enter a description and an amount.',
+            recProcessed: '{0} recurring transaction(s) recorded', negSuffix: ' — ⚠️ negative balance',
+            recModalTitle: 'Monthly recurring transaction', recTypeExp: '➖ Expense (rent, subscription...)', recTypeInc: '➕ Income (salary...)',
+            recDescPh: 'Description (e.g. Rent)', recDayLabel: 'Day of month (1–28) — starts from the next upcoming date', type: 'Type',
+            basketTitle: 'Shopping list', basketPh: 'Enter an item here...', basketItemAria: 'List item',
+            basketMicAria: 'Voice input for the list', basketAdd: 'Add to list', basketEmpty: 'The list is empty',
+            bpTitleDefault: 'Record it as an expense?', bpTitleItem: 'Bought “{0}”? Record it as an expense', pricePh: 'Price', skip: 'Skip',
+            bpNeedPrice: 'Enter the price or tap Skip.',
+            historyTitle: 'Transaction history', searchPh: 'Search history', searchAria: 'Search', all: 'All',
+            noMatches: 'No matching results', noTx: 'No transactions yet', edit: 'Edit', del: 'Delete',
+            cashToBank: 'Cash → Bank', bankToCash: 'Bank → Cash', transferTo: 'Transfer to {0}',
+            delNegConfirm: 'Deleting this transaction will make an account balance negative. Do you want to continue?',
+            delConfirm: 'Are you sure you want to delete this transaction?',
+            backupSection: 'Backup & security', exportBtn: 'Download backup', importBtn: 'Restore backup', csvBtn: 'Export CSV',
+            pinBtn: 'Lock code', pinChange: 'Change lock code', pinRemove: 'Remove lock code', pinSetTitle: 'Set lock code',
+            txAddExpense: 'Add expense', txAddIncome: 'Add income', amount: 'Amount', descOpt: 'Description (optional)',
+            desc: 'Description', dateTime: 'Date & time', cancel: 'Cancel',
+            descExpense: 'Expense', descManual: 'Manual balance addition',
+            invalidAmount: 'Please enter a valid amount!', insufficient: 'Insufficient balance in this account!',
+            transferTitle: 'Transfer between accounts', fromCashE: 'From: 💵 Cash account', fromBankE: 'From: 🏦 Bank account',
+            toBankE: 'To: 🏦 Bank account', toCashE: 'To: 💵 Cash account', transAmountPh: 'Enter the amount here...',
+            transFrom: 'Transfer from', transTo: 'Transfer to', transferInvalid: 'Amount is insufficient or invalid!',
+            editTitle: 'Edit transaction', editCashToBank: 'From Cash to Bank', editBankToCash: 'From Bank to Cash',
+            editNeg: 'This edit would make the balance negative!',
+            pinOldPh: 'Current code', pinNewPh: 'New code (4 to 8 digits)', pinNew2Ph: 'Re-enter the code',
+            tryAfter: 'Try again in {0} seconds', tooMany: 'Too many attempts. Wait {0} seconds.', wrongPin: 'Incorrect code',
+            forgotInfo: 'The code only protects the interface from casual use. If you forget it: clear the site data from your browser settings, then restore from a backup.',
+            pinOldWrong: 'The current code is incorrect', pinRemoved: 'Lock code removed', pinFormat: 'The code must be 4 to 8 digits',
+            pinMismatch: 'The codes do not match', pinSet: 'Lock code set 🔐',
+            bkTitle: 'Backup', bkPassPh: 'Encryption password (optional)',
+            bkNote: 'Leave it empty for a normal backup. If you set a password you will need it to restore, and there is no way to recover it if you forget it.',
+            bkDownload: '⬇️ Download', bkShare: '📤 Share',
+            impTitle: 'The backup is encrypted 🔒', impPassPh: 'Password', decrypt: 'Decrypt',
+            cryptoNeedHttps: 'Encryption requires opening the app over HTTPS.', decryptNeedHttps: 'Decryption requires opening the app over HTTPS.',
+            shareTitle: 'My Wallet backup', backupFail: 'Could not create the backup.', saveFail: 'Could not save data! Storage is full or unavailable. Download a backup now.',
+            csvDate: 'Date', csvType: 'Type', csvDesc: 'Description', csvCat: 'Category', csvAcc: 'Account', csvAmount: 'Amount',
+            csvCashBank: 'Cash→Bank', csvBankCash: 'Bank→Cash',
+            invalidFile: 'Invalid file!', fileTooBig: 'The file is too large!',
+            importConfirm: 'Your current data will be replaced by the imported backup ({0} transactions). Do you want to continue?',
+            restored: 'Data restored successfully! ✅', wrongPass: 'Wrong password or the file is corrupted.',
+            lastBackup: 'Last backup: {0}', noBackupYet: 'No backup has been downloaded yet',
+            persistOk: '🔒 Storage is protected from automatic clearing',
+            persistNo: 'ℹ️ The browser did not confirm storage protection — installing the app and backing up regularly is recommended',
+            recording: 'Recording... speak now',
+            micDenied: 'Microphone permission was denied. Allow the browser to use the mic in the site settings.',
+            micNetwork: 'Network problem. Check your internet connection (voice recognition needs internet).',
+            micNone: 'No microphone was found.', micNoSpeech: 'I didn’t hear anything, please try again.', micError: 'Microphone error: {0}',
+            noSpeechSupport: 'Your browser does not support voice recording. Type the transaction in the box below.', noSpeechAlert: 'Your browser does not support voice recording.',
+            voiceIncomeDesc: 'Voice income', voiceDone: '{0} transaction(s) recorded! ✅', voiceRejected: ' ({0} failed: insufficient balance)',
+            voiceInsufficient: 'Insufficient balance in the {0} account for this transaction.', voiceNoAmount: 'Could not recognize the amount. Please try again.',
+            cur: 'EGP', choose: 'Choose',
+            brandText: 'My Smart Wallet by Deskora — an easy-to-use app that works entirely by voice, hands-free. This is a simplified edition; for the Professional version, please contact us by email:',
+            notFound: 'Page not found'
+        }
+    };
+
+    // التصنيفات بتتخزن بالعربي (عشان النسخ الاحتياطية القديمة تفضل شغالة) وبتتعرض بلغة الواجهة
+    // Categories are stored in Arabic (so old backups keep working) and displayed in the UI language
+    const CATS_EN = {
+        'أكل وشرب 🍔': 'Food & Drink 🍔', 'مواصلات 🚗': 'Transport 🚗', 'فواتير 🧾': 'Bills 🧾', 'ملابس 👕': 'Clothing 👕',
+        'صحة 🏥': 'Health 🏥', 'ادخار 💎': 'Savings 💎', 'أخرى 📦': 'Other 📦',
+        'راتب 💼': 'Salary 💼', 'دخل إضافي 🎁': 'Extra income 🎁', 'دخل 💰': 'Income 💰', 'تحويل 🔄': 'Transfer 🔄'
+    };
+
+    let lang = 'ar';
+    try { const s = localStorage.getItem('walletLang'); if (s === 'en' || s === 'ar') lang = s; } catch (e) {}
+    const listeners = [];
+
+    function t(key) {
+        const args = Array.prototype.slice.call(arguments, 1);
+        let s = (DICT[lang] && DICT[lang][key]);
+        if (s == null) s = DICT.ar[key];
+        if (s == null) return key;
+        return s.replace(/\{(\d+)\}/g, (m, i) => (args[i] != null ? args[i] : ''));
+    }
+    const catLabel = (c) => (lang === 'en' && Object.prototype.hasOwnProperty.call(CATS_EN, c)) ? CATS_EN[c] : c;
+
+    function apply() {
+        const root = document.documentElement;
+        root.setAttribute('lang', lang);
+        root.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+        document.title = t('pageTitle');
+        document.querySelectorAll('[data-i18n]').forEach((n) => { n.textContent = t(n.getAttribute('data-i18n')); });
+        document.querySelectorAll('[data-i18n-html]').forEach((n) => { n.innerHTML = t(n.getAttribute('data-i18n-html')); }); // نصوص ثابتة من القاموس فقط
+        document.querySelectorAll('[data-i18n-ph]').forEach((n) => { n.setAttribute('placeholder', t(n.getAttribute('data-i18n-ph'))); });
+        document.querySelectorAll('[data-i18n-aria]').forEach((n) => { n.setAttribute('aria-label', t(n.getAttribute('data-i18n-aria'))); });
+        const lb = document.getElementById('langBtn');
+        if (lb) { lb.textContent = t('langBtn'); lb.setAttribute('aria-label', t('langBtnAria')); lb.setAttribute('lang', lang === 'ar' ? 'en' : 'ar'); }
+    }
+
+    function setLang(l) {
+        if (l !== 'ar' && l !== 'en') return;
+        lang = l;
+        try { localStorage.setItem('walletLang', l); } catch (e) {}
+        apply();
+        listeners.forEach((fn) => { try { fn(l); } catch (e) { console.error(e); } });
+    }
+
+    window.I18N = {
+        t, catLabel, apply, setLang, dict: DICT,
+        get lang() { return lang; },
+        onChange(fn) { listeners.push(fn); }
+    };
+    apply();
+})();
