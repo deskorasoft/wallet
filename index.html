@@ -15,7 +15,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <meta name="theme-color" content="#4CAF50">
+    <meta name="theme-color" content="#12795A">
 
     <style>
         :root {
@@ -229,6 +229,33 @@
         .brand-card p { font-size: 12.5px; color: var(--text-muted); line-height: 1.7; margin-top: 6px; }
         .brand-card a { display: inline-block; margin-top: 10px; padding: 9px 18px; border-radius: 12px; background: var(--primary); color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; direction: ltr; }
         [data-theme="dark"] .brand-card a { color: #06231a; }
+
+        /* التراجع / التصنيفات / الترحيب */
+        #toast.has-action { pointer-events: auto; display: flex; align-items: center; gap: 12px; }
+        .toast-undo { background: #fff; color: #14231F; border: none; border-radius: 10px; padding: 6px 14px; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+        .cat-hint { font-size: 12px; color: var(--text-muted); line-height: 1.7; margin: 8px 2px; }
+        .cat-add { display: flex; gap: 8px; align-items: stretch; }
+        .cat-add .modal-input { margin-bottom: 0; }
+        .cat-add .modal-btn { flex: 0 0 auto; padding: 0 18px; }
+        .cat-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 12px; margin: 8px 0; font-weight: 600; font-size: 14.5px; }
+        .cat-row button { background: none; border: none; color: #BF3B2B; font-size: 20px; cursor: pointer; padding: 0 4px; }
+        .cat-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 14px 0; }
+        .brand-links { margin-top: 12px; display: flex; justify-content: center; gap: 8px 16px; flex-wrap: wrap; }
+        .link-btn { background: none; border: none; color: var(--primary); font-size: 12.5px; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 4px; }
+        .welcome-step { display: flex; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--field); margin: 10px 0; font-size: 14.5px; line-height: 1.8; font-weight: 500; }
+        .legal h4 { font-size: 15px; font-weight: 700; margin: 16px 0 4px; color: var(--primary); }
+        .legal p { font-size: 13.5px; line-height: 1.85; color: var(--text-main); }
+        .legal small { display: block; margin-top: 14px; color: var(--text-muted); font-size: 12px; }
+        .confirm-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; }
+        .confirm-toggle input { width: 18px; height: 18px; accent-color: var(--primary); }
+        .review-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1.5px solid var(--border-color); border-radius: 14px; margin: 8px 0; background: var(--field); }
+        .review-row .r-ic { font-size: 22px; }
+        .review-row .r-main { flex: 1; min-width: 0; }
+        .review-row .r-desc { font-weight: 700; font-size: 15px; overflow-wrap: anywhere; }
+        .review-row .r-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+        .review-row .r-amt { font-weight: 800; font-size: 16px; white-space: nowrap; }
+        .review-row .r-amt.tr { color: var(--info); } .review-row .r-amt.inc { color: var(--primary); } .review-row .r-amt.exp { color: var(--danger); }
+        .review-warn { font-size: 12.5px; color: var(--warn); font-weight: 600; margin: 8px 2px; }
     </style>
 </head>
 <body>
@@ -299,6 +326,7 @@
         </div>
 
         <small data-i18n="voiceExample">(مثال: قهوة 50 وعصير 20 / دخل 1000 مرتب)</small>
+        <label class="confirm-toggle"><input type="checkbox" id="confirmToggle"> <span data-i18n="confirmToggle">✋ مراجعة قبل الحفظ</span></label>
     </div>
 
     <div class="card">
@@ -382,6 +410,7 @@
             <button class="btn-backup" id="importBtn" data-i18n="importBtn">استرجاع نسخة</button>
             <button class="btn-backup" id="csvBtn" data-i18n="csvBtn">تصدير CSV</button>
             <button class="btn-backup" id="pinBtn">رمز القفل</button>
+            <button class="btn-backup" id="catsBtn" data-i18n="catsBtn">التصنيفات</button>
         </div>
         <div class="backup-btns" style="margin-top:10px;"><button class="btn-backup" id="pinRemoveBtn" style="display:none" data-i18n="pinRemove">إزالة رمز القفل</button></div>
         <div class="backup-note" id="lastBackupNote"></div>
@@ -392,6 +421,75 @@
         <div class="brand-name">Deskora</div>
         <p data-i18n="brandText">محفظتي الذكية من Deskora — تطبيق سهل الاستخدام يعمل بالكامل بالصوت ودون الحاجة إلى استخدام اليدين. هذه نسخة مبسّطة، وللحصول على النسخة الاحترافية يُرجى التواصل معنا عبر البريد الإلكتروني:</p>
         <a href="mailto:deskora.software@gmail.com" rel="noopener noreferrer">deskora.software@gmail.com</a>
+        <div class="brand-links">
+            <button class="link-btn" id="guideBtn" type="button" data-i18n="guideBtn">كيف أستخدم التطبيق؟</button>
+            <button class="link-btn" id="privBtn" type="button" data-i18n="privBtn">الخصوصية والشروط</button>
+        </div>
+    </div>
+</div>
+
+<!-- مراجعة قبل الحفظ -->
+<div class="modal-overlay" id="modalReview">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="reviewTitle">راجع قبل الحفظ</div>
+        <div id="reviewList"></div>
+        <div class="review-warn" id="reviewWarn"></div>
+        <div class="cat-hint" data-i18n="reviewHint"></div>
+        <div class="modal-btns">
+            <button class="modal-btn modal-confirm" id="reviewOkBtn" type="button" data-i18n="reviewOk">تمام ✅</button>
+            <button class="modal-btn modal-cancel" id="reviewUndoBtn" type="button" data-i18n="reviewUndo">تراجع ↩️</button>
+        </div>
+    </div>
+</div>
+
+<!-- إدارة التصنيفات -->
+<div class="modal-overlay" id="modalCats">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="catsTitle">إدارة التصنيفات</div>
+        <select id="catType" class="modal-select">
+            <option value="expense" data-i18n="expense">مصروف</option>
+            <option value="income" data-i18n="income">دخل</option>
+        </select>
+        <div class="cat-add">
+            <input type="text" id="catName" class="modal-input" maxlength="24" placeholder="اسم التصنيف" data-i18n-ph="catNamePh" autocomplete="off">
+            <button class="modal-btn modal-confirm" id="catAddBtn" type="button" data-i18n="add">إضافة</button>
+        </div>
+        <div class="cat-hint" data-i18n="catHint"></div>
+        <div id="catList"></div>
+        <div class="modal-btns">
+            <button class="modal-btn modal-cancel" data-close="modalCats" data-i18n="close">إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- شاشة الترحيب -->
+<div class="modal-overlay" id="modalWelcome">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="welcomeTitle">أهلاً بك في محفظتي الذكية 👋</div>
+        <div class="welcome-step" data-i18n="welcome1"></div>
+        <div class="welcome-step" data-i18n="welcome2"></div>
+        <div class="welcome-step" data-i18n="welcome3"></div>
+        <div class="brand-links"><button class="link-btn" id="welcomePrivBtn" type="button" data-i18n="privBtn">الخصوصية والشروط</button></div>
+        <div class="modal-btns" style="margin-top:14px">
+            <button class="modal-btn modal-confirm" data-close="modalWelcome" data-i18n="welcomeStart">ابدأ الآن</button>
+        </div>
+    </div>
+</div>
+
+<!-- الخصوصية والشروط -->
+<div class="modal-overlay" id="modalPrivacy">
+    <div class="modal-content legal">
+        <div class="modal-title" data-i18n="privTitle">الخصوصية وشروط الاستخدام</div>
+        <h4 data-i18n="privH1"></h4><p data-i18n="priv1"></p>
+        <h4 data-i18n="privH2"></h4><p data-i18n="priv2"></p>
+        <h4 data-i18n="privH3"></h4><p data-i18n="priv3"></p>
+        <h4 data-i18n="privH4"></h4><p data-i18n="priv4"></p>
+        <h4 data-i18n="privH5"></h4><p data-i18n="priv5"></p>
+        <h4 data-i18n="privH6"></h4><p data-i18n="priv6"></p>
+        <small data-i18n="privUpdated"></small>
+        <div class="modal-btns" style="margin-top:14px">
+            <button class="modal-btn modal-cancel" data-close="modalPrivacy" data-i18n="close">إغلاق</button>
+        </div>
     </div>
 </div>
 

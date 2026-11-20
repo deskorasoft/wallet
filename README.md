@@ -13,8 +13,19 @@
 
 ## المميزات
 
-- 🎙️ **تسجيل بالصوت وبدون استخدام اليدين**: يدعم العربية (اللهجة المصرية والفصحى) والإنجليزية، ويفهم الأرقام المنطوقة مثل «خمسين» و«ألف وخمسمائة» و«two hundred and fifty».
+- 🎙️ **تسجيل بالصوت وبدون استخدام اليدين**: يدعم العربية (اللهجة المصرية والفصحى) والإنجليزية، ويفهم الأرقام المنطوقة مثل «خمسين» و«ألف وخمسمائة» و«two hundred and fifty». المايك **يظل شغالًا حتى تضغط إيقاف**، فتكمل كلامك براحتك دون أن يُغلق وسط الجملة.
 - 🌐 **واجهة ثنائية اللغة (عربي / English)** مع زر للتبديل بين اللغتين بنقرة واحدة.
+- ✅ **مراجعة قبل الحفظ (اختيارية)**: خيار تفعّله بنفسك تحت المايك؛ فيعرض التطبيق ما فهمه من أمرك، فتضغط «تمام» للحفظ أو «تراجع» للإلغاء. وهو مُعطَّل افتراضيًا لتبقى ميزة **التسجيل السريع** كما هي، ويبقى زر «تراجع» متاحًا بعد الحفظ في الحالتين.
+- 🧠 **أوامر صوتية ذكية** (بالعربية والإنجليزية):
+  - عدة عمليات في جملة واحدة: «قهوة 50 وعصير 20».
+  - تحديد الحساب بالكلام: «قهوة 50 من البنك»، «غداء 30 كاش».
+  - تواريخ منطوقة: «أمس تاكسي 80»، «من 3 أيام غداء 100».
+  - تحويل بين الحسابات: «حوّل 500 للبنك».
+  - الادخار لهدف: «ادخرت 200 لهدف السفر».
+  - أسئلة سريعة: «كام رصيدي؟»، «كام صرفت النهاردة؟».
+  - قول «تراجع» بعد التسجيل للتراجع عنه.
+- 🏷️ **تصنيفات مخصصة** للمصروف والدخل، يتعرف عليها الأمر الصوتي عند ذكر اسمها.
+- 👋 **شاشة ترحيب** عند أول استخدام، مع صفحة **الخصوصية وشروط الاستخدام**.
 - 💵 **حسابان منفصلان**: الكاش والبنك، مع إمكانية التحويل بينهما.
 - 🧾 **تصنيف تلقائي** للمصروفات (طعام، مواصلات، فواتير، ملابس، صحة…) وتحليل بياني للمصروفات والدخل.
 - 📊 **ميزانية شهرية** لكل تصنيف مع تنبيه عند الاقتراب من الحد أو تجاوزه.
@@ -44,8 +55,19 @@
 
 ## Features
 
-- 🎙️ **Hands-free voice entry** in Arabic (Egyptian dialect & Modern Standard) and English, including spoken numbers such as "fifty" or "two hundred and fifty".
+- 🎙️ **Hands-free voice entry** in Arabic (Egyptian dialect & Modern Standard) and English, including spoken numbers such as "fifty" or "two hundred and fifty". The mic **keeps listening until you tap stop**, so it never cuts you off mid-sentence.
 - 🌐 **Bilingual interface (Arabic / English)** with a one-tap language switch.
+- ✅ **Review before saving (optional)**: an option you turn on yourself under the mic; the app then shows what it understood and you tap “OK” to save or “Undo” to cancel. It is off by default so **quick recording** stays as is, and an Undo button remains available after saving either way.
+- 🧠 **Smarter voice commands** (Arabic & English):
+  - Several transactions in one sentence: “coffee 50 and juice 20”.
+  - Pick the account by voice: “coffee 50 from bank”, “lunch 30 cash”.
+  - Spoken dates: “yesterday taxi 80”, “3 days ago lunch 100”.
+  - Transfers between accounts: “transfer 500 to bank”.
+  - Saving toward a goal: “save 200 to vacation”.
+  - Quick questions: “what’s my balance?”, “how much did I spend today?”.
+  - Say “undo” right after recording to cancel it.
+- 🏷️ **Custom categories** for expenses and income, recognized by voice commands when you say their name.
+- 👋 **Welcome screen** on first launch, plus a **Privacy & terms** page.
 - 💵 **Two separate accounts** (Cash and Bank) with transfers between them.
 - 🧾 **Automatic categorization** and charts for expenses and income.
 - 📊 **Monthly budgets** per category with warnings when you get close to or exceed the limit.
@@ -64,6 +86,7 @@
   *Never commit any backup (`wallet_backup*.json`) or CSV file to this repository.*
 - عند أي تعديل: غيّر رقم `CACHE_NAME` في `sw.js` ثم `git add . && git commit -m "update" && git push`.
   *After any change, bump `CACHE_NAME` in `sw.js`, then `git add . && git commit -m "update" && git push`.*
+- **النشر على GitHub Pages / Deploying:** Settings ← Pages ← Source: *Deploy from a branch* ← `main` / `(root)`. الرابط: `https://USERNAME.github.io/REPO/` (كل المسارات نسبية فتشتغل داخل أي مسار فرعي). ملف `.gitignore` بيمنع رفع النسخ الاحتياطية وملفات CSV، و`.nojekyll` بيخلي GitHub يخدم الملفات كما هي.
 - الملفات: `index.html` (الواجهة)، `app.js` (المنطق)، `i18n.js` (قاموس الترجمة عربي/English)، `sw.js` (العمل بدون إنترنت)، `manifest.json`.
   *Files: `index.html` (UI), `app.js` (logic), `i18n.js` (Arabic/English dictionary), `sw.js` (offline), `manifest.json`.*
 - لإضافة أو تعديل نص في الواجهة: عدّل المفتاح في `i18n.js` (قسم `ar` وقسم `en`). التصنيفات بتتخزن بالعربي داخليًا عشان النسخ الاحتياطية القديمة تفضل شغالة.

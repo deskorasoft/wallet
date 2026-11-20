@@ -1,5 +1,5 @@
 // غيّر رقم الإصدار عند كل تحديث للتطبيق
-const CACHE_NAME = 'wallet-gh-v2';
+const CACHE_NAME = 'wallet-gh-v7';
 const CORE = [
   './',
   './index.html',

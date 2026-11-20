@@ -1,4 +1,12 @@
-# متحطش نسخ احتياطية من بياناتك المالية على GitHub أبداً
-wallet_backup*
+# نسخ احتياطية وبيانات شخصية — لا تُرفع أبدًا / Personal backups & data — never commit
+wallet_backup*.json
 *backup*.json
 *.csv
+
+# ملفات النظام والمحررات
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+node_modules/

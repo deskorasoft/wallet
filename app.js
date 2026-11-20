@@ -151,12 +151,49 @@
         }
         return segs;
     }
+    // ---- التواريخ المنطوقة: أمس / أول امبارح / من 3 أيام / yesterday / 3 days ago ----
+    function extractDate(text) {
+        const rules = [
+            [/(?:^|\s)(?:من|منذ|قبل)\s+(\d+)\s+(?:يوم|ايام|أيام)(?=\s|$)/, (m) => parseInt(m[1], 10)],
+            [/\b(\d+)\s+days?\s+ago\b/i, (m) => parseInt(m[1], 10)],
+            [/(?:^|\s)(?:[اأإ]ول\s+(?:[اأإ]?م?بارح|[اأإ]مس)|قبل\s+(?:[اأإ]?م?بارح|[اأإ]مس))(?=\s|$)/, () => 2],
+            [/\bday before yesterday\b/i, () => 2],
+            [/(?:^|\s)(?:[اأإ]?م?بارح|[اأإ]مس)(?=\s|$)/, () => 1],
+            [/\byesterday\b/i, () => 1],
+            [/(?:^|\s)(?:النهارد[هة]|اليوم)(?=\s|$)/, () => 0],
+            [/\btoday\b/i, () => 0]
+        ];
+        for (const [re, f] of rules) {
+            const m = text.match(re);
+            if (m) { const days = Math.min(f(m), 365); return { days, text: text.replace(re, ' ').replace(/\s+/g, ' ').trim() }; }
+        }
+        return { days: 0, text };
+    }
+    function daysAgoTs(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.getTime(); }
     // ===PURE_END===
 
     // ---------- ثوابت ----------
     const CATEGORIES = ['أكل وشرب 🍔', 'مواصلات 🚗', 'فواتير 🧾', 'ملابس 👕', 'صحة 🏥', 'ادخار 💎', 'أخرى 📦'];
     const INCOME_CATS = ['راتب 💼', 'دخل إضافي 🎁', 'دخل 💰'];
     const OTHER_CAT = 'أخرى 📦';
+    const MAX_CUSTOM_CATS = 20;
+    const expCats = () => CATEGORIES.concat(state.customCats.expense);
+    const incCats = () => INCOME_CATS.concat(state.customCats.income);
+    // اسم التصنيف بدون رموز/إيموجي للمطابقة في الأوامر الصوتية
+    const catKey = (c) => String(c).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+    const findCustomCat = (list, text) => { const t = String(text).toLowerCase(); return list.find((c) => { const k = catKey(c); return k && t.includes(k); }); };
+    // تنظيف أسماء التصنيفات المخصصة (يمنع الأسماء الخطرة مثل __proto__ والتكرار)
+    function cleanCatName(n) { return String(n == null ? '' : n).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24); }
+    function cleanCats(arr, builtin) {
+        const out = [], seen = new Set(builtin.map((x) => x.toLowerCase()).concat(builtin.map(catKey).filter(Boolean)));
+        (Array.isArray(arr) ? arr : []).forEach((n) => {
+            const v = cleanCatName(n);
+            const k = catKey(v);
+            if (!v || (v in Object.prototype) || seen.has(v.toLowerCase()) || (k && seen.has(k)) || out.length >= MAX_CUSTOM_CATS) return;
+            seen.add(v.toLowerCase()); if (k) seen.add(k); out.push(v);
+        });
+        return out;
+    }
     const SAVING_CAT = 'ادخار 💎';
     const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
     const STORAGE_KEY = 'myWalletData';
@@ -184,7 +221,15 @@
     const safeSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
     const safeDel = (k) => { try { localStorage.removeItem(k); } catch (e) {} };
     let toastTimer;
-    function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 4500); }
+    function toast(msg, undoFn) {
+        const t = $('toast'); t.textContent = msg; t.classList.remove('has-action');
+        if (undoFn) {
+            t.appendChild(el('button', { type: 'button', class: 'toast-undo', text: T('undoBtn'), on: { click: () => { t.classList.remove('show', 'has-action'); undoFn(); } } }));
+            t.classList.add('has-action');
+        }
+        t.classList.add('show'); clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove('show', 'has-action'), undoFn ? 9000 : 4500);
+    }
     function fillSelect(sel, list) { const prev = sel.value; sel.innerHTML = ''; list.forEach((c) => sel.appendChild(el('option', { value: c, text: catLabel(c) }))); if (prev && list.includes(prev)) sel.value = prev; }
     function downloadBlob(blob, name) {
         const url = URL.createObjectURL(blob);
@@ -209,7 +254,7 @@
     });
 
     // ---------- النوافذ ----------
-    const openModal = (id) => $(id).classList.add('active');
+    const openModal = (id) => { const tt = $('toast'); if (tt.classList.contains('has-action')) tt.classList.remove('show', 'has-action'); $(id).classList.add('active'); }; // إشعار التراجع ما يغطيش أزرار النوافذ
     const closeModal = (id) => $(id).classList.remove('active');
     document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeModal(b.dataset.close)));
     document.querySelectorAll('.modal-overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) o.classList.remove('active'); }));
@@ -220,7 +265,7 @@
         const TITLES = {
             accountSelect: 'account', txAccount: 'account', editAccount: 'account', goalAcc: 'account', recAcc: 'account', bpAcc: 'account',
             txCat: 'category', editCat: 'category', recCat: 'category', bpCat: 'category', budgetCat: 'category',
-            transFrom: 'transFrom', transTo: 'transTo', recType: 'type', typeFilter: 'type', periodSelect: 'period', chartMode: 'analysisType'
+            transFrom: 'transFrom', transTo: 'transTo', catType: 'type', recType: 'type', typeFilter: 'type', periodSelect: 'period', chartMode: 'analysisType'
         };
         const overlay = el('div', { class: 'dd-overlay' });
         const sheet = el('div', { class: 'dd-sheet', role: 'dialog' });
@@ -272,7 +317,7 @@
     // ---------- البيانات ----------
     let state = emptyState();
     let period = 'all';
-    function emptyState() { return { balances: { cash: 0, bank: 0 }, transactions: [], basket: [], budgets: {}, goals: [], recurring: [], lastBackup: 0 }; }
+    function emptyState() { return { balances: { cash: 0, bank: 0 }, transactions: [], basket: [], budgets: {}, goals: [], recurring: [], customCats: { expense: [], income: [] }, lastBackup: 0 }; }
 
     function normalizeState(raw) {
         const s = emptyState();
@@ -280,6 +325,9 @@
         const b = raw.balances || {};
         s.balances.cash = amt(Number(b.cash)) || 0;
         s.balances.bank = amt(Number(b.bank)) || 0;
+        const cc = (raw.customCats && typeof raw.customCats === 'object') ? raw.customCats : {};
+        s.customCats.expense = cleanCats(cc.expense, CATEGORIES);
+        s.customCats.income = cleanCats(cc.income, INCOME_CATS);
         s.transactions = (Array.isArray(raw.transactions) ? raw.transactions : []).map((t) => {
             if (!t || typeof t !== 'object') return null;
             const type = ['expense', 'income', 'transfer'].includes(t.type) ? t.type : null;
@@ -293,7 +341,7 @@
             return tx;
         }).filter(Boolean);
         s.basket = (Array.isArray(raw.basket) ? raw.basket : []).map((i) => (i && i.text != null) ? { id: Number(i.id) || Date.now() + Math.random(), text: String(i.text).slice(0, 200), checked: !!i.checked } : null).filter(Boolean);
-        if (raw.budgets && typeof raw.budgets === 'object') CATEGORIES.forEach((c) => { const v = amt(Number(raw.budgets[c])); if (v > 0) s.budgets[c] = v; });
+        if (raw.budgets && typeof raw.budgets === 'object') CATEGORIES.concat(s.customCats.expense).forEach((c) => { const v = amt(Number(raw.budgets[c])); if (v > 0) s.budgets[c] = v; });
         s.goals = (Array.isArray(raw.goals) ? raw.goals : []).map((g) => {
             const target = amt(Number(g && g.target));
             if (!g || !(target > 0)) return null;
@@ -339,6 +387,7 @@
 
     function getCategory(text) {
         text = text.toLowerCase();
+        const custom = findCustomCat(state.customCats.expense, text); if (custom) return custom;
         if (/أكل|اكل|قهوة|قهوه|عصير|مطعم|سوبر|خضار|فاكهة|لحمة|فراخ|شاي|عيش|جبنة|لبن|\b(?:food|meals?|lunch|dinner|breakfast|coffee|tea|juice|restaurant|grocer\w*|supermarket|vegetables?|fruits?|meat|chicken|bread|cheese|milk|snacks?|pizza|burger)\b/.test(text)) return CATEGORIES[0];
         if (/مواصلات|تاكسي|بنزين|أتوبيس|اتوبيس|ميكروباص|مترو|أوبر|اوبر|كريم|\b(?:transport\w*|taxi|uber|careem|fuel|petrol|gasoline|bus|metro|train|ride|tickets?)\b/.test(text)) return CATEGORIES[1];
         if (/كهربا|مية|غاز|نت|فاتورة|فاتوره|تليفون|شحن|\b(?:electricity|water|internet|wifi|bills?|phone|recharge|top.?up)\b/.test(text)) return CATEGORIES[2];
@@ -423,7 +472,7 @@
     function openTxModal(type) {
         txType = type;
         $('txTitle').textContent = type === 'expense' ? T('txAddExpense') : T('txAddIncome');
-        fillSelect($('txCat'), type === 'expense' ? CATEGORIES : INCOME_CATS);
+        fillSelect($('txCat'), type === 'expense' ? expCats() : incCats());
         $('txCat').value = type === 'expense' ? OTHER_CAT : INCOME_CATS[2];
         $('txAmount').value = ''; $('txDesc').value = '';
         $('txDate').value = toLocalInput(Date.now());
@@ -484,7 +533,8 @@
             accSel.appendChild(el('option', { value: 'cash', text: T('accCashE') }));
             accSel.appendChild(el('option', { value: 'bank', text: T('accBankE') }));
             accSel.value = txAccount(t);
-            const cats = t.type === 'expense' ? CATEGORIES : INCOME_CATS;
+            let cats = t.type === 'expense' ? expCats() : incCats();
+            if (t.category && !cats.includes(t.category)) cats = cats.concat(t.category); // تصنيف محذوف: ما نغيّرهوش بصمت
             fillSelect($('editCat'), cats);
             $('editCat').value = cats.includes(t.category) ? t.category : cats[cats.length - 1];
         }
@@ -524,7 +574,7 @@
     const budgetMonth = () => period !== 'all' ? period : monthKey(Date.now());
     function renderBudgets() {
         const sel = $('budgetCat');
-        fillSelect(sel, CATEGORIES);
+        fillSelect(sel, expCats());
         const key = budgetMonth();
         $('budgetTitle').textContent = T('budgetOf', monthLabel(key));
         const list = $('budgetList'); list.innerHTML = '';
@@ -603,7 +653,7 @@
             ]));
         });
     }
-    function fillRecCats() { fillSelect($('recCat'), $('recType').value === 'expense' ? CATEGORIES : INCOME_CATS); $('recCat').value = $('recType').value === 'expense' ? OTHER_CAT : INCOME_CATS[2]; }
+    function fillRecCats() { fillSelect($('recCat'), $('recType').value === 'expense' ? expCats() : incCats()); $('recCat').value = $('recType').value === 'expense' ? OTHER_CAT : INCOME_CATS[2]; }
     $('recType').addEventListener('change', fillRecCats);
     $('recOpenBtn').addEventListener('click', () => { $('recType').value = 'expense'; fillRecCats(); $('recDesc').value = ''; $('recAmount').value = ''; $('recDay').value = 1; openModal('modalRec'); });
     $('recDesc').addEventListener('input', () => { if ($('recType').value === 'expense') $('recCat').value = getCategory($('recDesc').value); });
@@ -655,7 +705,7 @@
     function openBasketPay(item) {
         basketPayItem = item;
         $('bpTitle').textContent = T('bpTitleItem', item.text.slice(0, 40));
-        fillSelect($('bpCat'), CATEGORIES); $('bpCat').value = getCategory(item.text);
+        fillSelect($('bpCat'), expCats()); $('bpCat').value = getCategory(item.text);
         $('bpAmount').value = ''; $('bpAcc').value = $('accountSelect').value;
         openModal('modalBasketPay');
     }
@@ -875,7 +925,7 @@
         safeSet(PIN_KEY, JSON.stringify(pinData)); updatePinButtons(); closeModal('modalPin'); toast(T('pinSet'));
     });
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) hiddenAt = Date.now();
+        if (document.hidden) { hiddenAt = Date.now(); [mainRec, basketRec].forEach((r) => { if (r && r.listening) r.cancel(true); }); }
         else {
             if (pinData && !locked && hiddenAt && Date.now() - hiddenAt > 60000) lockApp();
             if (!locked) processRecurring();
@@ -906,44 +956,100 @@
         if (kind) voiceText.classList.add(kind);
         if (autoReset) statusTimer = setTimeout(() => { voiceTextContent.textContent = DEFAULT_STATUS(); voiceText.classList.remove('error', 'warn'); }, 4500);
     }
+    // نص الكلام من كل نتائج الجلسة (مع إزالة التكرار اللي بيحصل في بعض متصفحات الموبايل)
+    const IS_ANDROID = /Android/i.test(navigator.userAgent || '');
+    function textOfResults(results) {
+        const parts = [];
+        for (let i = 0; i < results.length; i++) {
+            const t = ((results[i] && results[i][0] && results[i][0].transcript) || '').trim(); if (!t) continue;
+            const prev = parts[parts.length - 1];
+            // أندرويد بس: كل نتيجة بتيجي متراكمة (تحتوي اللي قبلها) فنستبدل بدل ما نكرر. في باقي الأجهزة كل نتيجة جملة مستقلة (ممكن تتكرر فعلاً)
+            if (IS_ANDROID && prev && t.length > prev.length && t.startsWith(prev)) parts[parts.length - 1] = t;
+            else parts.push(t);
+        }
+        return parts.join(' ');
+    }
+    // تسجيل متواصل: المايك بيفضل شغال لحد ما المستخدم يضغط إيقاف (وبيتعاد تشغيله لو المتصفح قفله لوحده)
+    const MAX_LISTEN_MS = 180000;
     function makeRecognizer(onText, ui) {
         if (!SR) return null;
         const r = new SR();
-        r.lang = speechLang(); r.continuous = false; r.interimResults = false; r.listening = false;
-        r.onstart = () => { r.listening = true; playBeep(900, 0.15); ui.start(); };
-        r.onresult = (e) => { if (e.results[0] && e.results[0][0]) onText(e.results[0][0].transcript); };
-        r.onerror = (e) => {
-            ui.stop(r);
-            const msgs = {
-                'not-allowed': T('micDenied'), 'service-not-allowed': T('micDenied'), 'network': T('micNetwork'),
-                'audio-capture': T('micNone'), 'no-speech': T('micNoSpeech')
-            };
-            if (e.error !== 'aborted') ui.error(msgs[e.error] || T('micError', e.error));
+        r.lang = speechLang(); r.continuous = true; r.interimResults = true; r.listening = false;
+        let committed = '', current = '', running = false, done = true, wantOn = false, startedAt = 0, quick = 0, restarts = 0, finishTimer = null, maxTimer = null;
+        const full = () => (committed + ' ' + current).replace(/\s+/g, ' ').trim();
+        const clearTimers = () => { clearTimeout(finishTimer); clearTimeout(maxTimer); };
+        function finalize() {
+            if (done) return; done = true; wantOn = false; clearTimers();
+            const text = full(); ui.stop(r);
+            if (running) { try { r.abort(); } catch (e) {} } // لو المتصفح ما قفلش الجلسة (ما جاش onend) نجبره عشان المرة الجاية تشتغل
+            if (text) onText(text); else ui.error(T('micNoSpeech'));
+        }
+        r.begin = () => {
+            if (!done) return; // فيه جلسة شغالة أو بتبدأ (مثلاً ضغطتين سريعتين أو إذن الميكروفون ظاهر)
+            done = false; wantOn = true; committed = ''; current = ''; restarts = 0; quick = 0;
+            clearTimers(); maxTimer = setTimeout(() => r.finish(), MAX_LISTEN_MS);
+            try { r.start(); } catch (e) { // فشل التشغيل: نرجّع الحالة نضيفة بدل ما تفضل معلّقة
+                console.log(e); done = true; wantOn = false; clearTimers(); r.listening = false; ui.error(T('micError', (e && e.message) || 'start'));
+            }
         };
-        r.onend = () => ui.stop(r);
+        r.finish = () => { // المستخدم ضغط إيقاف
+            if (done) return; wantOn = false; clearTimeout(maxTimer);
+            if (running) { try { r.stop(); } catch (e) { finalize(); return; } clearTimeout(finishTimer); finishTimer = setTimeout(finalize, 2500); } else finalize();
+        };
+        // إلغاء من غير حفظ (تبديل مايك/لغة أو خروج من التطبيق). keep=true: الكلام اللي اتسمع يتحط في خانة الكتابة عشان ما يضيعش
+        r.cancel = (keep) => {
+            if (done) return; done = true; wantOn = false; clearTimers();
+            const text = full(); try { r.abort(); } catch (e) {} ui.stop(r);
+            if (keep && text && ui.salvage) ui.salvage(text);
+        };
+        r.onstart = () => { running = true; startedAt = Date.now(); if (!r.listening) { r.listening = true; playBeep(900, 0.15); ui.start(); } };
+        r.onresult = (e) => { current = textOfResults(e.results); if (ui.live) ui.live(full()); };
+        r.onerror = (e) => {
+            if (e.error === 'no-speech' || e.error === 'aborted') return; // onend هيعيد التشغيل أو ينهي
+            if (done) return; done = true; wantOn = false; clearTimers();
+            const text = full(); ui.stop(r);
+            if (text && ui.salvage) ui.salvage(text); // خطأ في النص ده؟ ما نضيّعش اللي اتقال
+            const msgs = { 'not-allowed': T('micDenied'), 'service-not-allowed': T('micDenied'), 'network': T('micNetwork'), 'audio-capture': T('micNone') };
+            ui.error((msgs[e.error] || T('micError', e.error)) + (text && ui.salvage ? ' ' + T('micSalvaged') : ''));
+        };
+        r.onend = () => {
+            running = false;
+            if (done) return;
+            if (wantOn) { // المتصفح قفل لوحده والمستخدم لسه بيتكلم: كمّل
+                quick = (Date.now() - startedAt < 500) ? quick + 1 : 0;
+                if (quick >= 3 || restarts >= 40) return finalize();
+                committed = full(); current = ''; restarts++;
+                setTimeout(() => { if (wantOn && !done) { try { r.start(); } catch (e) { finalize(); } } }, 120);
+                return;
+            }
+            finalize();
+        };
         return r;
     }
     const mainRec = makeRecognizer((t) => processVoiceCommand(t), {
-        start() { micBtn.classList.add('listening'); micBtn.textContent = '⏹️'; setStatus(T('recording'), null); voiceTextContent.dataset.rec = '1'; voiceText.classList.add('recording'); },
+        start() { micBtn.classList.add('listening'); micBtn.setAttribute('aria-pressed', 'true'); micBtn.textContent = '⏹️'; setStatus(T('recording'), null); voiceTextContent.dataset.rec = '1'; voiceText.classList.add('recording'); },
         stop(r) {
             const was = r.listening; r.listening = false;
-            micBtn.classList.remove('listening'); micBtn.textContent = '🎙️'; voiceText.classList.remove('recording');
+            micBtn.classList.remove('listening'); micBtn.setAttribute('aria-pressed', 'false'); micBtn.textContent = '🎙️'; voiceText.classList.remove('recording');
             if (voiceTextContent.dataset.rec === '1') { voiceTextContent.textContent = DEFAULT_STATUS(); voiceTextContent.dataset.rec = ''; }
             if (was) playBeep(500, 0.15);
         },
+        live(t) { if (voiceTextContent.dataset.rec === '1') voiceTextContent.textContent = t ? '🎙️ ' + t : T('recording'); },
+        salvage(t) { $('textCmd').value = t; setStatus(T('micSalvaged'), 'warn', true); },
         error(msg) { setStatus(msg, 'error', true); }
     });
     const basketRec = makeRecognizer((t) => addBasketItem(t), {
         start() { basketMicBtn.classList.add('listening'); basketMicBtn.textContent = '⏹️'; },
         stop(r) { const was = r.listening; r.listening = false; basketMicBtn.classList.remove('listening'); basketMicBtn.textContent = '🎙️'; if (was) playBeep(500, 0.15); },
+        salvage(t) { $('basketInput').value = t.slice(0, 200); },
         error(msg) { alert(msg); }
     });
     if (!mainRec) { micBtn.style.opacity = '0.5'; setStatus(T('noSpeechSupport'), 'warn'); }
     function toggleRec(rec, other) {
         if (!rec) return alert(T('noSpeechAlert'));
-        if (rec.listening) { rec.stop(); return; }
-        if (other && other.listening) { try { other.abort(); } catch (e) {} }
-        try { rec.start(); } catch (e) { console.log(e); }
+        if (rec.listening) { rec.finish(); return; }
+        if (other && other.listening) { other.cancel(); setTimeout(() => rec.begin(), 250); return; } // نسيب المايك التاني يقفل الأول
+        rec.begin();
     }
     micBtn.addEventListener('click', () => toggleRec(mainRec, basketRec));
     basketMicBtn.addEventListener('click', () => toggleRec(basketRec, mainRec));
@@ -954,45 +1060,263 @@
     const SALARY_WORDS = ['مرتب', 'راتب', 'salary', 'paycheck', 'wage', 'wages'];
     const EXPENSE_WORDS = ['صرفت', 'دفعت', 'شريت', 'مصروف', 'اشتريت', 'أشتريت', 'جبت',
         'spent', 'paid', 'bought', 'purchased', 'expense', 'buy', 'pay'];
-    const lw = (w) => w.toLowerCase().replace(/[.,!?]/g, '');
+    const lw = (w) => w.toLowerCase().replace(/[.,!?؟،]/g, '').replace(/[\u064B-\u0652\u0640]/g, '');
 
-    function processVoiceCommand(text) {
-        const account = $('accountSelect').value, accName = account === 'cash' ? T('cash') : T('bank');
-        const segs = parseSegments(wordsToNumbersEn(wordsToNumbers(convertDigits(String(text || '')))));
-        let added = 0, rejected = 0; const touched = [];
-        segs.forEach((s) => {
+    // التراجع عن آخر أمر صوتي/مكتوب
+    function undoTxs(list) {
+        let n = 0;
+        list.slice().reverse().forEach((t) => {
+            const i = state.transactions.findIndex((x) => x.id === t.id);
+            if (i > -1) {
+                applyTx(state.transactions[i], -1);
+                if (t.goalId) { const g = state.goals.find((x) => x.id === t.goalId); if (g) g.saved = Math.max(0, round2(g.saved - t.amount)); }
+                state.transactions.splice(i, 1); n++;
+            }
+        });
+        if (n) { saveData(); setStatus(T('undone'), null, true); }
+    }
+
+    // ---- مفردات الأوامر الذكية ----
+    const BANK_ACC = new Set(['بنك', 'بنكي', 'فيزا', 'bank', 'visa']);
+    const CASH_ACC = new Set(['كاش', 'نقدي', 'نقدا', 'cash']);
+    const TO_W = new Set(['to', 'into', 'الى', 'إلى', 'الي']);
+    const FROM_W = new Set(['from', 'من', 'عن']);
+    const BY_W = new Set(['by', 'with', 'using', 'via', 'in', 'at', 'في']);
+    const TRANSFER_W = new Set(['حول', 'حولت', 'حولي', 'تحويل', 'انقل', 'نقلت', 'transfer', 'transferred', 'move', 'moved']);
+    const SAVE_W = new Set(['ادخرت', 'ادخر', 'وفرت', 'وفر', 'save', 'saved', 'saving']);
+    const STOP_W = ['on', 'for', 'at', 'على', 'في'];
+    // كلمة حساب (بنك/كاش) مع حرف الجر الملتصق: للبنك / بالكاش / البنك
+    function accToken(w) {
+        const t = lw(w);
+        const tries = [[t, ''], [t.replace(/^ال/, ''), ''], [t.replace(/^لل/, ''), 'to'], [t.replace(/^بال/, ''), 'by'], [t.replace(/^ب/, ''), 'by'], [t.replace(/^ل/, ''), 'to']];
+        for (const [k, prep] of tries) {
+            if (BANK_ACC.has(k)) return { acc: 'bank', prep };
+            if (CASH_ACC.has(k)) return { acc: 'cash', prep };
+        }
+        return null;
+    }
+    const accLabel = (a) => (a === 'cash' ? T('cash') : T('bank'));
+    const dayLabel = (ts) => new Date(ts).toLocaleDateString(LOC(), { weekday: 'short', day: 'numeric', month: 'short' });
+
+    // 1) تحليل الأمر بدون أي حفظ (بيحاكي الأرصدة عشان التحقق يكون صحيح داخل الأمر الواحد)
+    function parseCommand(text) {
+        const defAcc = $('accountSelect').value;
+        const dt = extractDate(wordsToNumbersEn(wordsToNumbers(convertDigits(String(text || '')))));
+        const ts = dt.days > 0 ? daysAgoTs(dt.days) : undefined;
+        const segs = parseSegments(dt.text);
+        const bal = { cash: state.balances.cash, bank: state.balances.bank };
+        const items = []; let rejected = 0, rejAcc = defAcc;
+        const info = segs.map((s) => {
+            const words = s.desc.split(/\s+/).filter(Boolean), extra = s.extra ? s.extra.split(/\s+/).filter(Boolean) : [];
+            const all = words.concat(extra), refs = [], drop = new Set();
+            all.forEach((w, i) => {
+                const a = accToken(w); if (!a) return;
+                const prev = i > 0 ? lw(all[i - 1]) : '';
+                const prevPrep = TO_W.has(prev) ? 'to' : FROM_W.has(prev) ? 'from' : BY_W.has(prev) ? 'by' : '';
+                const role = a.prep || prevPrep;
+                if (!role && i !== all.length - 1) return; // كلمة "bank" لوحدها في نص الوصف مش اختيار حساب
+                refs.push({ acc: a.acc, role: role || 'by', i });
+                drop.add(i); if (prevPrep) drop.add(i - 1);
+            });
+            return { words, extra, all, refs, drop };
+        });
+        // "قهوة 50 من البنك وعصير 20": الكلام بعد الرقم مباشرة (حساب/حرف جر/و) بيخص العملية اللي قبله
+        if (!/^\s*\d/.test(dt.text)) {
+            for (let k = 1; k < info.length; k++) {
+                const cur = info[k], prevInfo = info[k - 1];
+                for (let i = 0; i < cur.all.length; i++) {
+                    const w = lw(cur.all[i]), a = accToken(cur.all[i]);
+                    if (a) {
+                        const prevW = i > 0 ? lw(cur.all[i - 1]) : '';
+                        const role = a.prep || (TO_W.has(prevW) ? 'to' : FROM_W.has(prevW) ? 'from' : 'by');
+                        prevInfo.refs.push({ acc: a.acc, role });
+                        cur.drop.add(i); if (i > 0 && (TO_W.has(prevW) || FROM_W.has(prevW) || BY_W.has(prevW))) cur.drop.add(i - 1);
+                        const ti = i; cur.refs = cur.refs.filter((r) => r.i !== ti);
+                    } else if (!(TO_W.has(w) || FROM_W.has(w) || BY_W.has(w) || w === 'و' || w === 'and' || w === 'ثم' || w === 'then')) break;
+                }
+            }
+        }
+        const totalRefs = info.reduce((n, x) => n + x.refs.length, 0);
+        const globalAcc = totalRefs === 1 ? info.find((x) => x.refs.length).refs[0].acc : null; // حساب مذكور مرة واحدة = لكل العمليات
+        const lead = (t, k) => { let r = t.replace(/^(?:و|and)\s+/i, ''); if (k > 0) r = r.replace(/^و(?=\S)/, ''); return r.trim(); };
+
+        segs.forEach((s, idx) => {
             if (!(s.amount > 0)) return;
             const amount = amt(s.amount); if (!(amount > 0)) return;
-            const words = s.desc.split(/\s+/).filter(Boolean);
-            const allWords = s.extra ? words.concat(s.extra.split(/\s+/).filter(Boolean)) : words;
-            if (allWords.some((w) => INCOME_WORDS.includes(lw(w)))) {
-                const clean = allWords.filter((w) => lw(w) !== 'دخل' && lw(w) !== 'income').join(' ') || T('voiceIncomeDesc');
-                const cat = allWords.some((w) => SALARY_WORDS.includes(lw(w))) ? INCOME_CATS[0] : INCOME_CATS[2];
-                const t = addTransaction({ type: 'income', amount, description: clean + ' (' + accName + ')', category: cat, account });
-                applyTx(t, 1);
-            } else {
-                let base = words.filter((w) => !EXPENSE_WORDS.includes(lw(w)));
-                if (!base.length && s.extra) base = s.extra.split(/\s+/).filter((w) => w && !['on', 'for', 'at', 'على', 'في'].includes(lw(w))); // "spent 30 on pizza"
-                const clean = base.join(' ') || T('descExpense');
-                if (state.balances[account] < amount) { rejected++; return; }
-                const category = getCategory(clean);
-                const t = addTransaction({ type: 'expense', amount, description: clean + ' (' + accName + ')', category, account });
-                applyTx(t, 1); touched.push(category);
+            const { words, extra, all, refs, drop } = info[idx];
+            const keepAll = all.filter((_, i) => !drop.has(i));
+
+            // --- تحويل بين الحسابات: "حوّل 500 للبنك" / "transfer 200 from bank to cash" ---
+            if (refs.length && all.some((w) => TRANSFER_W.has(lw(w)))) {
+                let to = (refs.find((r) => r.role === 'to') || {}).acc, from = (refs.find((r) => r.role === 'from') || {}).acc;
+                if (!to && !from) to = refs[0].acc;
+                if (!to) to = from === 'cash' ? 'bank' : 'cash';
+                if (!from || from === to) from = to === 'cash' ? 'bank' : 'cash';
+                if (bal[from] < amount) { rejected++; rejAcc = from; return; }
+                bal[from] = round2(bal[from] - amount); bal[to] = round2(bal[to] + amount);
+                items.push({ type: 'transfer', amount, from, to, ts, category: 'تحويل 🔄', description: T('transferTo', accLabel(to)), shown: accLabel(from) + ' → ' + accLabel(to) });
+                return;
             }
-            added++;
+
+            const own = refs.find((r) => r.role !== 'to') || refs[0];
+            const account = own ? own.acc : (globalAcc || defAcc), accName = accLabel(account);
+
+            // --- دخل ---
+            if (keepAll.some((w) => INCOME_WORDS.includes(lw(w)))) {
+                const clean = lead(keepAll.filter((w) => lw(w) !== 'دخل' && lw(w) !== 'income').join(' '), idx) || T('voiceIncomeDesc');
+                const category = findCustomCat(state.customCats.income, clean) || (keepAll.some((w) => SALARY_WORDS.includes(lw(w))) ? INCOME_CATS[0] : INCOME_CATS[2]);
+                bal[account] = round2(bal[account] + amount);
+                items.push({ type: 'income', amount, account, ts, category, description: clean + ' (' + accName + ')', shown: clean });
+                return;
+            }
+
+            // --- ادخار لهدف: "ادخرت 200 للهدف سفر" / "save 200 to vacation" ---
+            if (state.goals.length && keepAll.some((w) => SAVE_W.has(lw(w)))) {
+                const joined = keepAll.join(' ').toLowerCase();
+                const g = state.goals.find((x) => { const k = catKey(x.name); return k && joined.includes(k); }) || (state.goals.length === 1 ? state.goals[0] : null);
+                if (g) {
+                    if (bal[account] < amount) { rejected++; rejAcc = account; return; }
+                    bal[account] = round2(bal[account] - amount);
+                    items.push({ type: 'expense', amount, account, ts, category: SAVING_CAT, goalId: g.id, description: T('savingDesc', g.name), shown: T('savingDesc', g.name) });
+                    return;
+                }
+            }
+
+            // --- مصروف ---
+            let base = words.filter((w, i) => !drop.has(i) && !EXPENSE_WORDS.includes(lw(w)));
+            if (!base.length && extra.length) base = extra.filter((w, j) => !drop.has(words.length + j) && w && !STOP_W.includes(lw(w))); // "spent 30 on pizza"
+            const clean = lead(base.join(' '), idx) || T('descExpense');
+            if (bal[account] < amount) { rejected++; rejAcc = account; return; }
+            bal[account] = round2(bal[account] - amount);
+            items.push({ type: 'expense', amount, account, ts, category: getCategory(clean), description: clean + ' (' + accName + ')', shown: clean });
         });
-        if (added > 0) {
-            saveData();
-            let msg = T('voiceDone', added), kind = null;
-            if (rejected > 0) { msg += T('voiceRejected', rejected); kind = 'warn'; }
-            const bw = budgetWarning(touched, monthKey(Date.now())); if (bw) { msg += ' ⚠️ ' + bw; kind = 'warn'; }
-            setStatus(msg, kind, true);
-        } else if (rejected > 0) setStatus(T('voiceInsufficient', accName), 'error', true);
-        else setStatus(T('voiceNoAmount'), 'error', true);
+        return { items, rejected, accName: accLabel(rejAcc) };
+    }
+
+    // 2) الحفظ الفعلي بعد الموافقة
+    let lastCommitted = [];
+    function commitCommand(r) {
+        const addedTx = [], touched = {}; let goalMsg = '';
+        r.items.forEach((it) => {
+            if (it.type !== 'income') { const src = it.type === 'transfer' ? it.from : it.account; if (state.balances[src] < it.amount) { r.rejected++; return; } } // أمان: الرصيد اتغيّر وقت المراجعة
+            const base = { type: it.type, amount: it.amount, description: it.description, category: it.category };
+            if (it.ts) base.ts = it.ts;
+            if (it.type === 'transfer') { base.from = it.from; base.to = it.to; } else base.account = it.account;
+            if (it.goalId) base.goalId = it.goalId;
+            const t = addTransaction(base);
+            applyTx(t, 1); addedTx.push(t);
+            if (it.type === 'expense') (touched[monthKey(t.ts)] = touched[monthKey(t.ts)] || []).push(it.category);
+            if (it.goalId) { const g = state.goals.find((x) => x.id === it.goalId); if (g) { const was = g.saved; g.saved = round2(g.saved + it.amount); if (was < g.target && g.saved >= g.target) goalMsg = T('goalReached', g.name); } }
+        });
+        if (!addedTx.length) return setStatus(T('voiceInsufficient', r.accName), 'error', true);
+        saveData();
+        lastCommitted = addedTx;
+        let msg = T('voiceDone', addedTx.length), kind = null;
+        if (r.rejected > 0) { msg += T('voiceRejected', r.rejected); kind = 'warn'; }
+        const bws = Object.keys(touched).map((k) => budgetWarning(touched[k], k)).filter(Boolean);
+        if (bws.length) { msg += ' ⚠️ ' + bws.join(' · '); kind = 'warn'; }
+        if (goalMsg) msg += ' ' + goalMsg;
+        setStatus(msg, kind, true);
+        toast(T('voiceDone', addedTx.length), () => undoTxs(addedTx));
+    }
+
+    // 3) شاشة المراجعة: تمام = حفظ، تراجع = إلغاء
+    const confirmBefore = () => safeGet('walletConfirm') === '1'; // اختياري: مطفي افتراضياً عشان التسجيل السريع
+    let pendingReview = null;
+    function openReview(r) {
+        pendingReview = r;
+        const list = $('reviewList'); list.innerHTML = '';
+        r.items.forEach((it) => {
+            const isT = it.type === 'transfer', isI = it.type === 'income';
+            const meta = isT ? catLabel(it.category) : catLabel(it.category) + ' · ' + accLabel(it.account);
+            list.appendChild(el('div', { class: 'review-row' }, [
+                el('span', { class: 'r-ic', text: isT ? '🔄' : isI ? '➕' : '➖' }),
+                el('div', { class: 'r-main' }, [
+                    el('div', { class: 'r-desc', text: it.shown }),
+                    el('div', { class: 'r-meta', text: meta + (it.ts ? ' · 📅 ' + dayLabel(it.ts) : '') })
+                ]),
+                el('span', { class: 'r-amt ' + (isT ? 'tr' : isI ? 'inc' : 'exp'), text: (isT ? '' : isI ? '+ ' : '- ') + fmt(it.amount) })
+            ]));
+        });
+        $('reviewWarn').textContent = r.rejected > 0 ? T('reviewRejected', r.rejected) : '';
+        setStatus(T('reviewPrompt'), null, true);
+        openModal('modalReview');
+    }
+    $('reviewOkBtn').addEventListener('click', () => { const r = pendingReview; pendingReview = null; closeModal('modalReview'); if (r) commitCommand(r); });
+    $('reviewUndoBtn').addEventListener('click', () => { pendingReview = null; closeModal('modalReview'); setStatus(T('cancelled'), null, true); });
+    $('confirmToggle').checked = confirmBefore();
+    $('confirmToggle').addEventListener('change', (e) => safeSet('walletConfirm', e.target.checked ? '1' : '0'));
+
+    // أسئلة سريعة بالصوت: "كام رصيدي؟" / "how much did I spend today?" (من غير ما يسجل حاجة)
+    function answerQuery(text) {
+        const t = String(text).toLowerCase();
+        const asks = /كام|كم|ايه|إيه|ما هو|what|how much|show|tell/.test(t);
+        if (/رصيد|balance|how much money/.test(t) && (asks || /رصيدي|balance/.test(t)))
+            return '💵 ' + T('cash') + ': ' + fmt(state.balances.cash) + ' · 🏦 ' + T('bank') + ': ' + fmt(state.balances.bank) + ' ' + T('cur');
+        if (asks && /صرفت|مصاريف|مصروفات|مصروف|spent|spend|expenses/.test(t)) {
+            const today = /النهارد|اليوم|today/.test(t), now = new Date(), key = monthKey(Date.now());
+            const sum = state.transactions.filter((x) => x.type === 'expense' && x.ts && (today ? new Date(x.ts).toDateString() === now.toDateString() : monthKey(x.ts) === key))
+                .reduce((n, x) => n + x.amount, 0);
+            return T(today ? 'qSpentToday' : 'qSpentMonth', fmt(round2(sum)) + ' ' + T('cur'));
+        }
+        return '';
+    }
+    const UNDO_RE = /^\s*(?:تراجع|الغاء|إلغاء|الغي|ألغي|undo|undo that|cancel|cancel that)\s*[.!؟]?\s*$/i;
+
+    function processVoiceCommand(text) {
+        if (UNDO_RE.test(text)) { // "تراجع" / "undo" بالصوت بعد التسجيل
+            if (lastCommitted.length) { const l = lastCommitted; lastCommitted = []; undoTxs(l); } else setStatus(T('nothingToUndo'), 'warn', true);
+            return;
+        }
+        const r = parseCommand(text);
+        if (!r.items.length) {
+            if (r.rejected > 0) return setStatus(T('voiceInsufficient', r.accName), 'error', true);
+            const q = answerQuery(text); if (q) return toast(q);
+            return setStatus(T('voiceNoAmount'), 'error', true);
+        }
+        if (confirmBefore()) openReview(r); else commitCommand(r);
     }
     function submitTextCmd() { const v = $('textCmd').value.trim(); if (!v) return; processVoiceCommand(v); $('textCmd').value = ''; }
     $('textCmdBtn').addEventListener('click', submitTextCmd);
     $('textCmd').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitTextCmd(); });
+
+    // ---------- التصنيفات المخصصة ----------
+    function renderCatList() {
+        const type = $('catType').value === 'income' ? 'income' : 'expense';
+        const list = $('catList'); list.innerHTML = '';
+        const items = state.customCats[type];
+        if (!items.length) { list.appendChild(el('div', { class: 'cat-empty', text: T('noCustomCats') })); return; }
+        items.forEach((c) => list.appendChild(el('div', { class: 'cat-row' }, [
+            el('span', { text: c }),
+            el('button', { type: 'button', 'aria-label': T('del'), text: '×', on: { click: () => {
+                if (!confirm(T('delCatConfirm', c))) return;
+                state.customCats[type] = state.customCats[type].filter((x) => x !== c);
+                if (type === 'expense') delete state.budgets[c];
+                saveData(); renderCatList();
+            } } })
+        ])));
+    }
+    function addCustomCat() {
+        const type = $('catType').value === 'income' ? 'income' : 'expense';
+        const v = cleanCatName($('catName').value);
+        if (!v || (v in Object.prototype)) return alert(T('catInvalid'));
+        const all = type === 'expense' ? expCats() : incCats();
+        const vk = catKey(v);
+        if (all.some((c) => c.toLowerCase() === v.toLowerCase() || catLabel(c).toLowerCase() === v.toLowerCase() || (vk && (catKey(c) === vk || catKey(catLabel(c)) === vk)))) return alert(T('catExists'));
+        if (state.customCats[type].length >= MAX_CUSTOM_CATS) return alert(T('catLimit'));
+        state.customCats[type].push(v);
+        saveData(); $('catName').value = ''; renderCatList(); toast(T('catAdded'));
+    }
+    $('catsBtn').addEventListener('click', () => { $('catType').value = 'expense'; $('catName').value = ''; renderCatList(); openModal('modalCats'); });
+    $('catType').addEventListener('change', renderCatList);
+    $('catAddBtn').addEventListener('click', addCustomCat);
+    $('catName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomCat(); } });
+
+    // ---------- الترحيب والخصوصية ----------
+    const ONBOARD_KEY = 'walletOnboarded';
+    $('guideBtn').addEventListener('click', () => openModal('modalWelcome'));
+    $('privBtn').addEventListener('click', () => openModal('modalPrivacy'));
+    $('welcomePrivBtn').addEventListener('click', () => { closeModal('modalWelcome'); openModal('modalPrivacy'); });
 
     // ---------- تبديل اللغة ----------
     function refreshLang() {
@@ -1001,7 +1325,7 @@
             if (!mainRec) setStatus(T('noSpeechSupport'), 'warn');
             else { clearTimeout(statusTimer); voiceTextContent.textContent = DEFAULT_STATUS(); voiceText.classList.remove('error', 'warn'); }
         }
-        [mainRec, basketRec].forEach((r) => { if (r) r.lang = speechLang(); });
+        [mainRec, basketRec].forEach((r) => { if (r) { if (r.listening) r.cancel(true); r.lang = speechLang(); } });
         updatePinButtons(); renderPersistNote(); updateToAccount();
         if (!locked) updateUI();
     }
@@ -1015,6 +1339,7 @@
     processRecurring();
     requestPersistence();
     if (pinData) lockApp();
+    else if (safeGet(ONBOARD_KEY) !== '1') { safeSet(ONBOARD_KEY, '1'); openModal('modalWelcome'); }
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
         navigator.serviceWorker.register('sw.js').catch((err) => console.log('SW Error', err));
     }
