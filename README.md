@@ -26,7 +26,7 @@
   - قول «تراجع» بعد التسجيل للتراجع عنه.
 - 🏷️ **تصنيفات مخصصة** للمصروف والدخل، يتعرف عليها الأمر الصوتي عند ذكر اسمها.
 - 👋 **شاشة ترحيب** عند أول استخدام، مع صفحة **الخصوصية وشروط الاستخدام**.
-- 💵 **حسابان منفصلان**: الكاش والبنك، مع إمكانية التحويل بينهما.
+- 💵 **حسابات متعددة**: كاش وبنك افتراضيًا، وتقدر تضيف أي حساب تاني (محفظة إلكترونية، ادخار، سفر…) وتغيّر أسماءها وتحذفها براحتك (على الأقل حساب واحد يفضل)، مع التحويل بينها والتعرف عليها بالصوت باسمها: «قهوة 50 من فودافون».
 - 🧾 **تصنيف تلقائي** للمصروفات (طعام، مواصلات، فواتير، ملابس، صحة…) وتحليل بياني للمصروفات والدخل.
 - 📊 **ميزانية شهرية** لكل تصنيف مع تنبيه عند الاقتراب من الحد أو تجاوزه.
 - 🎯 **أهداف الادخار** وتتبّع التقدّم نحوها.
@@ -68,7 +68,7 @@
   - Say “undo” right after recording to cancel it.
 - 🏷️ **Custom categories** for expenses and income, recognized by voice commands when you say their name.
 - 👋 **Welcome screen** on first launch, plus a **Privacy & terms** page.
-- 💵 **Two separate accounts** (Cash and Bank) with transfers between them.
+- 💵 **Multiple accounts**: Cash and Bank by default, plus any accounts you add (e-wallet, savings, travel…). Rename or delete any of them (at least one must remain), transfer between them, and refer to them by name in voice commands: “coffee 50 from vodafone”.
 - 🧾 **Automatic categorization** and charts for expenses and income.
 - 📊 **Monthly budgets** per category with warnings when you get close to or exceed the limit.
 - 🎯 **Savings goals** with progress tracking.
@@ -91,5 +91,7 @@
   *Files: `index.html` (UI), `app.js` (logic), `i18n.js` (Arabic/English dictionary), `sw.js` (offline), `manifest.json`.*
 - لإضافة أو تعديل نص في الواجهة: عدّل المفتاح في `i18n.js` (قسم `ar` وقسم `en`). التصنيفات بتتخزن بالعربي داخليًا عشان النسخ الاحتياطية القديمة تفضل شغالة.
   *To add or edit UI text, edit the key in `i18n.js` (both `ar` and `en`). Categories are stored in Arabic internally so older backups keep working.*
+- الحسابات بتتخزن في `state.accounts` (`id` + `name`)، والأرصدة في `state.balances[id]`. المعرّفان `cash` و`bank` ثابتان للتوافق مع النسخ القديمة، وكل حساب جديد معرّفه `a_xxxx`.
+  *Accounts live in `state.accounts` (`id` + `name`) and balances in `state.balances[id]`. The ids `cash` and `bank` are kept for backward compatibility; new accounts get an `a_xxxx` id.*
 
 © Deskora — deskora.software@gmail.com

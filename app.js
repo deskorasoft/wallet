@@ -265,7 +265,7 @@
         const TITLES = {
             accountSelect: 'account', txAccount: 'account', editAccount: 'account', goalAcc: 'account', recAcc: 'account', bpAcc: 'account',
             txCat: 'category', editCat: 'category', recCat: 'category', bpCat: 'category', budgetCat: 'category',
-            transFrom: 'transFrom', transTo: 'transTo', catType: 'type', recType: 'type', typeFilter: 'type', periodSelect: 'period', chartMode: 'analysisType'
+            transFrom: 'transFrom', transTo: 'transTo', editAccountTo: 'transTo', catType: 'type', recType: 'type', typeFilter: 'type', periodSelect: 'period', chartMode: 'analysisType'
         };
         const overlay = el('div', { class: 'dd-overlay' });
         const sheet = el('div', { class: 'dd-sheet', role: 'dialog' });
@@ -281,7 +281,8 @@
         function open(sel) {
             if (sel.disabled) return;
             current = sel; lastOpen = Date.now();
-            title.textContent = (TITLES[sel.id] ? T(TITLES[sel.id]) : '') || sel.getAttribute('aria-label') || T('choose');
+            const titleKey = sel.dataset.title || TITLES[sel.id];
+            title.textContent = (titleKey ? T(titleKey) : '') || sel.getAttribute('aria-label') || T('choose');
             list.innerHTML = '';
             Array.from(sel.options).forEach((o, i) => {
                 list.appendChild(el('button', {
@@ -317,14 +318,124 @@
     // ---------- البيانات ----------
     let state = emptyState();
     let period = 'all';
-    function emptyState() { return { balances: { cash: 0, bank: 0 }, transactions: [], basket: [], budgets: {}, goals: [], recurring: [], customCats: { expense: [], income: [] }, lastBackup: 0 }; }
+    function emptyState() { return { accounts: [{ id: 'cash', name: '' }, { id: 'bank', name: '' }], balances: { cash: 0, bank: 0 }, transactions: [], basket: [], budgets: {}, goals: [], recurring: [], customCats: { expense: [], income: [] }, lastBackup: 0 }; }
+
+    // ---------- الحسابات (كاش وبنك افتراضيًا + أي حسابات يضيفها المستخدم) ----------
+    // الحسابان الافتراضيان بيحتفظوا بالمعرّفين cash / bank عشان النسخ الاحتياطية القديمة تفضل شغالة.
+    // name فاضي = الاسم الافتراضي بيتعرض بلغة الواجهة؛ أي اسم تاني = اسم اختاره المستخدم.
+    const MAX_ACCOUNTS = 10;
+    const ACC_THEMES = 6;
+    const GENERIC_ACC_WORDS = new Set(['حساب', 'حسابي', 'account', 'my', 'the']);
+    const accIdOk = (id) => id === 'cash' || id === 'bank' || /^a_[a-z0-9]{1,24}$/i.test(id);
+    const hasAcc = (id) => state.accounts.some((a) => a.id === id);
+    const firstAcc = () => state.accounts[0].id;
+    const accName = (id) => {
+        const a = state.accounts.find((x) => x.id === id);
+        if (!a) return String(id);
+        return a.name || (id === 'cash' ? T('cash') : id === 'bank' ? T('bank') : T('accountDefault'));
+    };
+    const accNameTaken = (name, exceptId) => state.accounts.some((a) => a.id !== exceptId && accName(a.id).toLowerCase() === name.toLowerCase());
+    const arrow = () => (L() === 'en' ? ' → ' : ' ← ');
+    const txAccLabel = (t) => (t.type === 'transfer' ? accName(t.from) + arrow() + accName(t.to) : accName(t.account));
+
+    function renderAccounts() {
+        const box = $('accountsGrid'); box.innerHTML = '';
+        state.accounts.forEach((a, i) => box.appendChild(el('div', { class: 'account-box acc-bg' + (i % ACC_THEMES) }, [
+            el('h3', { text: accName(a.id) }),
+            el('div', { class: 'balance', text: fmt(state.balances[a.id]) + ' ' + T('cur') })
+        ])));
+    }
+    // opts: none = نص خيار "بدون" (اختياري)، label = دالة لنص الخيار، exclude = حساب يتشال من القائمة
+    function fillAccSelect(sel, opts) {
+        opts = opts || {};
+        const prev = sel.value; sel.innerHTML = '';
+        if (opts.none) sel.appendChild(el('option', { value: 'none', text: opts.none }));
+        state.accounts.forEach((a) => {
+            if (a.id === opts.exclude) return;
+            sel.appendChild(el('option', { value: a.id, text: opts.label ? opts.label(accName(a.id)) : accName(a.id) }));
+        });
+        if (prev && Array.from(sel.options).some((o) => o.value === prev)) sel.value = prev;
+    }
+    function updateToAccount() { fillAccSelect($('transTo'), { exclude: $('transFrom').value }); }
+    function fillAccountSelects() {
+        ['accountSelect', 'txAccount', 'recAcc', 'bpAcc', 'transFrom'].forEach((id) => fillAccSelect($(id)));
+        updateToAccount();
+        fillAccSelect($('goalAcc'), { none: T('goalAccNone'), label: (n) => T('goalAccFrom', n) });
+    }
+
+    function renderAccList() {
+        const list = $('accList'); list.innerHTML = '';
+        state.accounts.forEach((a) => {
+            const input = el('input', { type: 'text', class: 'acc-name-input', maxlength: '24', value: accName(a.id), autocomplete: 'off', 'aria-label': T('accNameAria') });
+            input.addEventListener('change', () => renameAccount(a.id, input));
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+            list.appendChild(el('div', { class: 'acc-row' }, [
+                el('div', { class: 'acc-main' }, [input, el('small', { text: fmt(state.balances[a.id]) + ' ' + T('cur') })]),
+                el('button', { type: 'button', class: 'tx-btn del', 'aria-label': T('del'), text: '×', on: { click: () => deleteAccount(a.id) } })
+            ]));
+        });
+    }
+    function renameAccount(id, input) {
+        const a = state.accounts.find((x) => x.id === id); if (!a) return;
+        const v = cleanCatName(input.value);
+        const revert = () => { input.value = accName(id); };
+        if (!v || (v in Object.prototype)) { revert(); return alert(T('accInvalidName')); }
+        if (accNameTaken(v, id)) { revert(); return alert(T('accExists')); }
+        input.value = v;
+        if (v === accName(id)) return;
+        a.name = v; saveData(); toast(T('accRenamed'));
+    }
+    function addAccount() {
+        const v = cleanCatName($('accName').value);
+        if (!v || (v in Object.prototype)) return alert(T('accInvalidName'));
+        if (state.accounts.length >= MAX_ACCOUNTS) return alert(T('accLimit'));
+        if (accNameTaken(v)) return alert(T('accExists'));
+        const rawOpen = $('accOpening').value.trim();
+        const opening = rawOpen === '' ? 0 : amt(parseFloat(rawOpen));
+        if (!(opening >= 0)) return alert(T('invalidAmount'));
+        const id = 'a_' + uid();
+        state.accounts.push({ id, name: v }); state.balances[id] = 0;
+        if (opening > 0) applyTx(addTransaction({ type: 'income', amount: opening, description: T('openingBal'), category: INCOME_CATS[2], account: id }), 1);
+        saveData(); $('accName').value = ''; $('accOpening').value = ''; renderAccList(); toast(T('accAdded'));
+    }
+    function deleteAccount(id) {
+        if (state.accounts.length <= 1) return alert(T('accLast'));
+        const related = state.transactions.filter((t) => (t.type === 'transfer' ? (t.from === id || t.to === id) : t.account === id));
+        if (!confirm(related.length ? T('delAccConfirmTx', accName(id), related.length) : T('delAccConfirm', accName(id)))) return;
+        related.forEach((t) => { // نعكس أثر كل عملية (فيها التحويلات: الحساب التاني بيرجع لرصيده)
+            applyTx(t, -1);
+            if (t.goalId) { const g = state.goals.find((x) => x.id === t.goalId); if (g) g.saved = Math.max(0, round2(g.saved - t.amount)); }
+        });
+        const gone = new Set(related);
+        state.transactions = state.transactions.filter((t) => !gone.has(t));
+        state.recurring = state.recurring.filter((r) => r.account !== id);
+        state.accounts = state.accounts.filter((a) => a.id !== id);
+        delete state.balances[id];
+        saveData(); renderAccList(); toast(T('accDeleted'));
+    }
+    $('manageAccBtn').addEventListener('click', () => { $('accName').value = ''; $('accOpening').value = ''; renderAccList(); openModal('modalAccounts'); });
+    $('accAddBtn').addEventListener('click', addAccount);
+    $('accName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addAccount(); } });
 
     function normalizeState(raw) {
         const s = emptyState();
         if (!raw || typeof raw !== 'object') return s;
-        const b = raw.balances || {};
-        s.balances.cash = amt(Number(b.cash)) || 0;
-        s.balances.bank = amt(Number(b.bank)) || 0;
+        if (Array.isArray(raw.accounts)) { // نسخ قديمة من غير accounts بتفضل كاش + بنك
+            const seen = new Set(), list = [];
+            raw.accounts.forEach((a) => {
+                if (!a || typeof a !== 'object' || list.length >= MAX_ACCOUNTS) return;
+                const id = String(a.id || '');
+                if (!accIdOk(id) || seen.has(id)) return;
+                seen.add(id);
+                list.push({ id, name: cleanCatName(a.name) || ((id === 'cash' || id === 'bank') ? '' : T('accountDefault')) });
+            });
+            if (list.length) s.accounts = list;
+        }
+        const b = (raw.balances && typeof raw.balances === 'object') ? raw.balances : {};
+        s.balances = {};
+        s.accounts.forEach((a) => { s.balances[a.id] = amt(Number(b[a.id])) || 0; });
+        const known = new Set(s.accounts.map((a) => a.id));
+        const fallbackAcc = known.has('bank') ? 'bank' : s.accounts[0].id;
         const cc = (raw.customCats && typeof raw.customCats === 'object') ? raw.customCats : {};
         s.customCats.expense = cleanCats(cc.expense, CATEGORIES);
         s.customCats.income = cleanCats(cc.income, INCOME_CATS);
@@ -336,8 +447,12 @@
             const description = String(t.description == null ? '' : t.description).slice(0, 200);
             const tx = { id: String(t.id || uid()), type, amount, description, category: String(t.category || OTHER_CAT).slice(0, 40), ts: Number(t.ts) || 0 };
             if (t.goalId) tx.goalId = String(t.goalId);
-            if (type === 'transfer') { tx.from = t.from === 'bank' ? 'bank' : 'cash'; tx.to = tx.from === 'cash' ? 'bank' : 'cash'; }
-            else tx.account = (t.account === 'bank' || t.account === 'cash') ? t.account : ((description.includes('(كاش)') || description.includes('(Cash)')) ? 'cash' : 'bank');
+            if (type === 'transfer') {
+                tx.from = known.has(t.from) ? t.from : s.accounts[0].id;
+                const other = (known.has(t.to) && t.to !== tx.from) ? t.to : (s.accounts.find((a) => a.id !== tx.from) || {}).id;
+                if (!other) return null; // تحويل بحساب واحد بس: غير صالح
+                tx.to = other;
+            } else tx.account = known.has(t.account) ? t.account : (((description.includes('(كاش)') || description.includes('(Cash)')) && known.has('cash')) ? 'cash' : fallbackAcc);
             return tx;
         }).filter(Boolean);
         s.basket = (Array.isArray(raw.basket) ? raw.basket : []).map((i) => (i && i.text != null) ? { id: Number(i.id) || Date.now() + Math.random(), text: String(i.text).slice(0, 200), checked: !!i.checked } : null).filter(Boolean);
@@ -352,7 +467,7 @@
             if (!r || !(amount > 0)) return null;
             return {
                 id: String(r.id || uid()), type: r.type === 'income' ? 'income' : 'expense', description: String(r.description || '').slice(0, 80),
-                amount, category: String(r.category || OTHER_CAT).slice(0, 40), account: r.account === 'bank' ? 'bank' : 'cash',
+                amount, category: String(r.category || OTHER_CAT).slice(0, 40), account: known.has(r.account) ? r.account : s.accounts[0].id,
                 day: Math.min(28, Math.max(1, parseInt(r.day, 10) || 1)), lastMonth: /^\d{4}-\d{2}$/.test(r.lastMonth) ? r.lastMonth : monthKey(Date.now())
             };
         }).filter(Boolean);
@@ -375,15 +490,17 @@
     }
 
     // ---------- منطق العمليات ----------
-    const txAccount = (t) => t.account || ((t.description.includes('(كاش)') || t.description.includes('(Cash)')) ? 'cash' : 'bank');
+    const txAccount = (t) => t.account;
     function applyTx(t, sign) {
         const a = t.amount * sign;
-        if (t.type === 'expense') { const k = txAccount(t); state.balances[k] = round2(state.balances[k] - a); }
-        else if (t.type === 'income') { const k = txAccount(t); state.balances[k] = round2(state.balances[k] + a); }
-        else { state.balances[t.from] = round2(state.balances[t.from] - a); state.balances[t.to] = round2(state.balances[t.to] + a); }
+        const move = (k, d) => { state.balances[k] = round2((state.balances[k] || 0) + d); };
+        if (t.type === 'expense') move(txAccount(t), -a);
+        else if (t.type === 'income') move(txAccount(t), a);
+        else { move(t.from, -a); move(t.to, a); }
     }
-    const hasNegative = () => state.balances.cash < 0 || state.balances.bank < 0;
-    const snapBal = () => ({ cash: state.balances.cash, bank: state.balances.bank });
+    const anyNeg = (b) => Object.values(b).some((v) => v < 0);
+    const hasNegative = () => anyNeg(state.balances);
+    const snapBal = () => Object.assign({}, state.balances);
 
     function getCategory(text) {
         text = text.toLowerCase();
@@ -421,9 +538,8 @@
     }
 
     function updateUI() {
-        $('cashBalance').textContent = fmt(state.balances.cash) + ' ' + T('cur');
-        $('bankBalance').textContent = fmt(state.balances.bank) + ' ' + T('cur');
-        buildPeriodSelect(); renderHistory(); renderSummary(); renderBasket(); renderBudgets(); renderGoals(); renderRecurring(); renderBackupInfo(); updateChart();
+        renderAccounts(); fillAccountSelects();
+                buildPeriodSelect(); renderHistory(); renderSummary(); renderBasket(); renderBudgets(); renderGoals(); renderRecurring(); renderBackupInfo(); updateChart();
     }
 
     // ---------- السجل ----------
@@ -433,7 +549,7 @@
         const q = $('searchBox').value.trim().toLowerCase();
         const ft = $('typeFilter').value;
         const txs = filteredTx().map((t, i) => ({ t, i }))
-            .filter(({ t }) => (ft === 'all' || t.type === ft) && (!q || (t.description + ' ' + t.category + ' ' + catLabel(t.category)).toLowerCase().includes(q)))
+            .filter(({ t }) => (ft === 'all' || t.type === ft) && (!q || (t.description + ' ' + t.category + ' ' + catLabel(t.category) + ' ' + txAccLabel(t)).toLowerCase().includes(q)))
             .sort((a, b) => (b.t.ts - a.t.ts) || (b.i - a.i)).map((x) => x.t);
         if (!txs.length) { list.appendChild(el('li', { class: 'empty-msg', text: q || ft !== 'all' ? T('noMatches') : T('noTx') })); return; }
         txs.forEach((t) => {
@@ -441,10 +557,10 @@
             if (t.type === 'income') { icon = '💰'; sign = '+'; color = 'var(--primary)'; }
             if (t.type === 'transfer') { icon = '🔄'; sign = ''; color = 'var(--info)'; }
             const meta = el('div', { class: 'history-meta' }, [el('span', { class: 'history-category', text: catLabel(t.category || OTHER_CAT) })]);
-            const accTxt = t.type === 'transfer' ? (t.from === 'cash' ? T('cashToBank') : T('bankToCash')) : (txAccount(t) === 'cash' ? T('cash') : T('bank'));
+            const accTxt = txAccLabel(t);
             meta.appendChild(el('span', { class: 'chip', text: accTxt }));
             if (t.ts) meta.appendChild(el('span', { class: 'history-date', text: new Date(t.ts).toLocaleString(LOC(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }));
-            const info = el('div', { class: 'history-info' }, [el('span', { class: 'history-desc' }, [el('span', { text: icon }), el('span', { text: t.type === 'transfer' ? T('transferTo', t.to === 'cash' ? T('cash') : T('bank')) : t.description })]), meta]);
+            const info = el('div', { class: 'history-info' }, [el('span', { class: 'history-desc' }, [el('span', { text: icon }), el('span', { text: t.type === 'transfer' ? T('transferTo', accName(t.to)) : t.description })]), meta]);
             const side = el('div', { class: 'history-side' }, [
                 el('span', { text: sign + ' ' + fmt(t.amount), style: 'color:' + color + '; font-weight:700;' }),
                 el('button', { class: 'tx-btn', 'aria-label': T('edit'), text: '✏️', on: { click: () => openEdit(t.id) } }),
@@ -460,7 +576,7 @@
         const t = state.transactions[index];
         const before = snapBal();
         applyTx(t, -1);
-        const goesNeg = hasNegative() && !(before.cash < 0 || before.bank < 0);
+        const goesNeg = hasNegative() && !anyNeg(before);
         if (!confirm(goesNeg ? T('delNegConfirm') : T('delConfirm'))) { state.balances = before; return; }
         if (t.goalId) { const g = state.goals.find((x) => x.id === t.goalId); if (g) g.saved = Math.max(0, round2(g.saved - t.amount)); }
         state.transactions.splice(index, 1);
@@ -497,18 +613,16 @@
     });
 
     // ---------- التحويل ----------
-    function updateToAccount() {
-        const toBank = $('transFrom').value === 'cash';
-        $('transTo').innerHTML = '';
-        $('transTo').appendChild(el('option', { value: toBank ? 'bank' : 'cash', text: T(toBank ? 'toBankE' : 'toCashE') }));
-    }
     $('transFrom').addEventListener('change', updateToAccount);
-    $('openTransferBtn').addEventListener('click', () => { updateToAccount(); openModal('modalTransfer'); });
+    $('openTransferBtn').addEventListener('click', () => {
+        if (state.accounts.length < 2) return alert(T('needTwoAcc'));
+        updateToAccount(); openModal('modalTransfer');
+    });
     $('transConfirmBtn').addEventListener('click', () => {
         const from = $('transFrom').value, to = $('transTo').value;
         const amount = amt(parseFloat($('transAmount').value));
         if (amount > 0 && state.balances[from] >= amount && from !== to) {
-            const t = addTransaction({ type: 'transfer', amount, description: T('transferTo', to === 'cash' ? T('cash') : T('bank')), category: 'تحويل 🔄', from, to });
+            const t = addTransaction({ type: 'transfer', amount, description: T('transferTo', accName(to)), category: 'تحويل 🔄', from, to });
             applyTx(t, 1);
             saveData(); closeModal('modalTransfer'); $('transAmount').value = '';
         } else alert(T('transferInvalid'));
@@ -524,15 +638,12 @@
         $('editDesc').value = t.description; $('editAmount').value = t.amount;
         $('editDate').value = toLocalInput(t.ts || Date.now());
         $('editDesc').style.display = $('editCat').style.display = isTr ? 'none' : '';
-        const accSel = $('editAccount'); accSel.innerHTML = '';
-        if (isTr) {
-            accSel.appendChild(el('option', { value: 'cash>bank', text: T('editCashToBank') }));
-            accSel.appendChild(el('option', { value: 'bank>cash', text: T('editBankToCash') }));
-            accSel.value = t.from + '>' + t.to;
-        } else {
-            accSel.appendChild(el('option', { value: 'cash', text: T('accCashE') }));
-            accSel.appendChild(el('option', { value: 'bank', text: T('accBankE') }));
-            accSel.value = txAccount(t);
+        const accSel = $('editAccount'), accTo = $('editAccountTo');
+        accSel.dataset.title = isTr ? 'transFrom' : 'account';
+        accTo.style.display = isTr ? '' : 'none';
+        fillAccSelect(accSel); accSel.value = isTr ? t.from : txAccount(t);
+        if (isTr) { fillAccSelect(accTo); accTo.value = t.to; }
+        else {
             let cats = t.type === 'expense' ? expCats() : incCats();
             if (t.category && !cats.includes(t.category)) cats = cats.concat(t.category); // تصنيف محذوف: ما نغيّرهوش بصمت
             fillSelect($('editCat'), cats);
@@ -545,18 +656,19 @@
         if (!t) return closeModal('modalEdit');
         const newAmount = amt(parseFloat($('editAmount').value));
         if (!(newAmount > 0)) return alert(T('invalidAmount'));
+        if (t.type === 'transfer' && $('editAccount').value === $('editAccountTo').value) return alert(T('transferInvalid'));
         const beforeBal = snapBal(), old = JSON.parse(JSON.stringify(t));
         applyTx(t, -1);
         t.amount = newAmount;
         t.ts = fromLocalInput($('editDate').value) || t.ts;
-        if (t.type === 'transfer') { const [f, to] = $('editAccount').value.split('>'); t.from = f; t.to = to; }
+        if (t.type === 'transfer') { t.from = $('editAccount').value; t.to = $('editAccountTo').value; }
         else {
             t.account = $('editAccount').value;
             t.description = $('editDesc').value.trim().slice(0, 80) || t.description;
             t.category = $('editCat').value;
         }
         applyTx(t, 1);
-        if (hasNegative() && !(beforeBal.cash < 0 || beforeBal.bank < 0)) {
+        if (hasNegative() && !anyNeg(beforeBal)) {
             state.balances = beforeBal;
             Object.keys(t).forEach((k) => delete t[k]); Object.assign(t, old);
             return alert(T('editNeg'));
@@ -648,7 +760,7 @@
         if (!state.recurring.length) { list.appendChild(el('div', { class: 'empty-msg', text: T('noRec') })); return; }
         state.recurring.forEach((r) => {
             list.appendChild(el('div', { class: 'rec-row' }, [
-                el('div', {}, [el('span', { text: (r.type === 'income' ? '➕ ' : '➖ ') + r.description }), el('small', { text: T('recLine', r.day, r.account === 'cash' ? T('cash') : T('bank'), catLabel(r.category)) })]),
+                el('div', {}, [el('span', { text: (r.type === 'income' ? '➕ ' : '➖ ') + r.description }), el('small', { text: T('recLine', r.day, accName(r.account), catLabel(r.category)) })]),
                 el('div', { class: 'goal-btns' }, [el('b', { text: fmt(r.amount) }), el('button', { class: 'tx-btn del', 'aria-label': T('del'), text: '×', on: { click: () => { if (confirm(T('delRecConfirm'))) { state.recurring = state.recurring.filter((x) => x.id !== r.id); saveData(); } } } })])
             ]));
         });
@@ -802,8 +914,8 @@
         const typeAr = { expense: T('expense'), income: T('income'), transfer: T('transfer') };
         const rows = [[T('csvDate'), T('csvType'), T('csvDesc'), T('csvCat'), T('csvAcc'), T('csvAmount')]];
         state.transactions.slice().sort((a, b) => a.ts - b.ts).forEach((t) => {
-            const acc = t.type === 'transfer' ? (t.from === 'cash' ? T('csvCashBank') : T('csvBankCash')) : (txAccount(t) === 'cash' ? T('cash') : T('bank'));
-            rows.push([t.ts ? toLocalInput(t.ts).replace('T', ' ') : '', typeAr[t.type], t.type === 'transfer' ? T('transferTo', t.to === 'cash' ? T('cash') : T('bank')) : t.description, catLabel(t.category), acc, t.amount]);
+            const acc = t.type === 'transfer' ? accName(t.from) + '→' + accName(t.to) : accName(txAccount(t));
+            rows.push([t.ts ? toLocalInput(t.ts).replace('T', ' ') : '', typeAr[t.type], t.type === 'transfer' ? T('transferTo', accName(t.to)) : t.description, catLabel(t.category), acc, t.amount]);
         });
         const csv = '\uFEFF' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
         downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'wallet_' + new Date().toISOString().slice(0, 10) + '.csv');
@@ -1077,40 +1189,55 @@
     }
 
     // ---- مفردات الأوامر الذكية ----
-    const BANK_ACC = new Set(['بنك', 'بنكي', 'فيزا', 'bank', 'visa']);
-    const CASH_ACC = new Set(['كاش', 'نقدي', 'نقدا', 'cash']);
+    const BANK_ALIASES = ['بنك', 'بنكي', 'فيزا', 'bank', 'visa'];
+    const CASH_ALIASES = ['كاش', 'نقدي', 'نقدا', 'cash'];
     const TO_W = new Set(['to', 'into', 'الى', 'إلى', 'الي']);
     const FROM_W = new Set(['from', 'من', 'عن']);
     const BY_W = new Set(['by', 'with', 'using', 'via', 'in', 'at', 'في']);
     const TRANSFER_W = new Set(['حول', 'حولت', 'حولي', 'تحويل', 'انقل', 'نقلت', 'transfer', 'transferred', 'move', 'moved']);
     const SAVE_W = new Set(['ادخرت', 'ادخر', 'وفرت', 'وفر', 'save', 'saved', 'saving']);
     const STOP_W = ['on', 'for', 'at', 'على', 'في'];
-    // كلمة حساب (بنك/كاش) مع حرف الجر الملتصق: للبنك / بالكاش / البنك
-    function accToken(w) {
+    // مفتاح كلمة للمطابقة: بدون رموز ولا "ال" التعريف
+    const nk = (w) => catKey(w).replace(/^ال(?=\S)/, '');
+    // خريطة كلمة ← حساب: كلمات أسماء الحسابات (اللي بتميّز حساب واحد بس) + مرادفات كاش/بنك للحسابين الأساسيين
+    function accLookup() {
+        const count = new Map(), owner = new Map(), map = new Map();
+        state.accounts.forEach((a) => {
+            new Set(accName(a.id).split(/\s+/).map(nk).filter((k) => k.length > 1 && !GENERIC_ACC_WORDS.has(k))).forEach((k) => { count.set(k, (count.get(k) || 0) + 1); owner.set(k, a.id); });
+        });
+        count.forEach((n, k) => { if (n === 1) map.set(k, owner.get(k)); });
+        // الأولوية: اسم الحساب كامل (كلمة واحدة) ← مرادفات كاش/بنك للحسابين الأساسيين ← كلمة مميّزة من اسم متعدد الكلمات
+        const exact = new Map();
+        state.accounts.forEach((a) => { const k = nk(accName(a.id)); if (k && !exact.has(k)) exact.set(k, a.id); });
+        BANK_ALIASES.forEach((k) => { if (hasAcc('bank') && !exact.has(nk(k))) map.set(nk(k), 'bank'); });
+        CASH_ALIASES.forEach((k) => { if (hasAcc('cash') && !exact.has(nk(k))) map.set(nk(k), 'cash'); });
+        exact.forEach((id, k) => map.set(k, id));
+        return map;
+    }
+    // كلمة حساب مع حرف الجر الملتصق: للبنك / بالكاش / البنك / لفودافون
+    function accToken(w, lk) {
         const t = lw(w);
-        const tries = [[t, ''], [t.replace(/^ال/, ''), ''], [t.replace(/^لل/, ''), 'to'], [t.replace(/^بال/, ''), 'by'], [t.replace(/^ب/, ''), 'by'], [t.replace(/^ل/, ''), 'to']];
-        for (const [k, prep] of tries) {
-            if (BANK_ACC.has(k)) return { acc: 'bank', prep };
-            if (CASH_ACC.has(k)) return { acc: 'cash', prep };
-        }
+        const tries = [[t, ''], [t.replace(/^لل/, ''), 'to'], [t.replace(/^بال/, ''), 'by'], [t.replace(/^ب/, ''), 'by'], [t.replace(/^ل/, ''), 'to']];
+        for (const [k, prep] of tries) { const id = lk.get(nk(k)); if (id) return { acc: id, prep }; }
         return null;
     }
-    const accLabel = (a) => (a === 'cash' ? T('cash') : T('bank'));
+    const accLabel = accName;
     const dayLabel = (ts) => new Date(ts).toLocaleDateString(LOC(), { weekday: 'short', day: 'numeric', month: 'short' });
 
     // 1) تحليل الأمر بدون أي حفظ (بيحاكي الأرصدة عشان التحقق يكون صحيح داخل الأمر الواحد)
     function parseCommand(text) {
-        const defAcc = $('accountSelect').value;
+        const defAcc = hasAcc($('accountSelect').value) ? $('accountSelect').value : firstAcc();
+        const lk = accLookup();
         const dt = extractDate(wordsToNumbersEn(wordsToNumbers(convertDigits(String(text || '')))));
         const ts = dt.days > 0 ? daysAgoTs(dt.days) : undefined;
         const segs = parseSegments(dt.text);
-        const bal = { cash: state.balances.cash, bank: state.balances.bank };
+        const bal = Object.assign({}, state.balances);
         const items = []; let rejected = 0, rejAcc = defAcc;
         const info = segs.map((s) => {
             const words = s.desc.split(/\s+/).filter(Boolean), extra = s.extra ? s.extra.split(/\s+/).filter(Boolean) : [];
             const all = words.concat(extra), refs = [], drop = new Set();
             all.forEach((w, i) => {
-                const a = accToken(w); if (!a) return;
+                const a = accToken(w, lk); if (!a) return;
                 const prev = i > 0 ? lw(all[i - 1]) : '';
                 const prevPrep = TO_W.has(prev) ? 'to' : FROM_W.has(prev) ? 'from' : BY_W.has(prev) ? 'by' : '';
                 const role = a.prep || prevPrep;
@@ -1125,7 +1252,7 @@
             for (let k = 1; k < info.length; k++) {
                 const cur = info[k], prevInfo = info[k - 1];
                 for (let i = 0; i < cur.all.length; i++) {
-                    const w = lw(cur.all[i]), a = accToken(cur.all[i]);
+                    const w = lw(cur.all[i]), a = accToken(cur.all[i], lk);
                     if (a) {
                         const prevW = i > 0 ? lw(cur.all[i - 1]) : '';
                         const role = a.prep || (TO_W.has(prevW) ? 'to' : FROM_W.has(prevW) ? 'from' : 'by');
@@ -1147,11 +1274,13 @@
             const keepAll = all.filter((_, i) => !drop.has(i));
 
             // --- تحويل بين الحسابات: "حوّل 500 للبنك" / "transfer 200 from bank to cash" ---
-            if (refs.length && all.some((w) => TRANSFER_W.has(lw(w)))) {
+            if (refs.length && state.accounts.length > 1 && all.some((w) => TRANSFER_W.has(lw(w)))) {
                 let to = (refs.find((r) => r.role === 'to') || {}).acc, from = (refs.find((r) => r.role === 'from') || {}).acc;
                 if (!to && !from) to = refs[0].acc;
-                if (!to) to = from === 'cash' ? 'bank' : 'cash';
-                if (!from || from === to) from = to === 'cash' ? 'bank' : 'cash';
+                // الطرف الغير مذكور: الحساب المختار فوق المايك، أو أول حساب مختلف
+                const other = (x) => (defAcc !== x ? defAcc : state.accounts.find((a) => a.id !== x).id);
+                if (!to) to = other(from);
+                if (!from || from === to) from = other(to);
                 if (bal[from] < amount) { rejected++; rejAcc = from; return; }
                 bal[from] = round2(bal[from] - amount); bal[to] = round2(bal[to] + amount);
                 items.push({ type: 'transfer', amount, from, to, ts, category: 'تحويل 🔄', description: T('transferTo', accLabel(to)), shown: accLabel(from) + ' → ' + accLabel(to) });
@@ -1159,14 +1288,14 @@
             }
 
             const own = refs.find((r) => r.role !== 'to') || refs[0];
-            const account = own ? own.acc : (globalAcc || defAcc), accName = accLabel(account);
+            const account = own ? own.acc : (globalAcc || defAcc);
 
             // --- دخل ---
             if (keepAll.some((w) => INCOME_WORDS.includes(lw(w)))) {
                 const clean = lead(keepAll.filter((w) => lw(w) !== 'دخل' && lw(w) !== 'income').join(' '), idx) || T('voiceIncomeDesc');
                 const category = findCustomCat(state.customCats.income, clean) || (keepAll.some((w) => SALARY_WORDS.includes(lw(w))) ? INCOME_CATS[0] : INCOME_CATS[2]);
                 bal[account] = round2(bal[account] + amount);
-                items.push({ type: 'income', amount, account, ts, category, description: clean + ' (' + accName + ')', shown: clean });
+                items.push({ type: 'income', amount, account, ts, category, description: clean, shown: clean });
                 return;
             }
 
@@ -1188,7 +1317,7 @@
             const clean = lead(base.join(' '), idx) || T('descExpense');
             if (bal[account] < amount) { rejected++; rejAcc = account; return; }
             bal[account] = round2(bal[account] - amount);
-            items.push({ type: 'expense', amount, account, ts, category: getCategory(clean), description: clean + ' (' + accName + ')', shown: clean });
+            items.push({ type: 'expense', amount, account, ts, category: getCategory(clean), description: clean, shown: clean });
         });
         return { items, rejected, accName: accLabel(rejAcc) };
     }
@@ -1198,7 +1327,9 @@
     function commitCommand(r) {
         const addedTx = [], touched = {}; let goalMsg = '';
         r.items.forEach((it) => {
-            if (it.type !== 'income') { const src = it.type === 'transfer' ? it.from : it.account; if (state.balances[src] < it.amount) { r.rejected++; return; } } // أمان: الرصيد اتغيّر وقت المراجعة
+            // أمان: الرصيد أو الحسابات ممكن تتغيّر وقت المراجعة
+            const src = it.type === 'transfer' ? it.from : it.account;
+            if (!hasAcc(src) || (it.type === 'transfer' && !hasAcc(it.to)) || (it.type !== 'income' && state.balances[src] < it.amount)) { r.rejected++; return; }
             const base = { type: it.type, amount: it.amount, description: it.description, category: it.category };
             if (it.ts) base.ts = it.ts;
             if (it.type === 'transfer') { base.from = it.from; base.to = it.to; } else base.account = it.account;
@@ -1252,7 +1383,7 @@
         const t = String(text).toLowerCase();
         const asks = /كام|كم|ايه|إيه|ما هو|what|how much|show|tell/.test(t);
         if (/رصيد|balance|how much money/.test(t) && (asks || /رصيدي|balance/.test(t)))
-            return '💵 ' + T('cash') + ': ' + fmt(state.balances.cash) + ' · 🏦 ' + T('bank') + ': ' + fmt(state.balances.bank) + ' ' + T('cur');
+            return '💰 ' + state.accounts.map((a) => accName(a.id) + ': ' + fmt(state.balances[a.id])).join(' · ') + ' ' + T('cur');
         if (asks && /صرفت|مصاريف|مصروفات|مصروف|spent|spend|expenses/.test(t)) {
             const today = /النهارد|اليوم|today/.test(t), now = new Date(), key = monthKey(Date.now());
             const sum = state.transactions.filter((x) => x.type === 'expense' && x.ts && (today ? new Date(x.ts).toDateString() === now.toDateString() : monthKey(x.ts) === key))
@@ -1326,7 +1457,7 @@
             else { clearTimeout(statusTimer); voiceTextContent.textContent = DEFAULT_STATUS(); voiceText.classList.remove('error', 'warn'); }
         }
         [mainRec, basketRec].forEach((r) => { if (r) { if (r.listening) r.cancel(true); r.lang = speechLang(); } });
-        updatePinButtons(); renderPersistNote(); updateToAccount();
+        updatePinButtons(); renderPersistNote(); renderAccList();
         if (!locked) updateUI();
     }
     $('langBtn').addEventListener('click', () => I18N.setLang(L() === 'ar' ? 'en' : 'ar'));

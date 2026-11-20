@@ -63,12 +63,14 @@
         /* الأرصدة: إطار ورقة نقدية */
         .hero { margin-bottom: 18px; }
         .accounts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-        .account-box { position: relative; overflow: hidden; isolation: isolate; border-radius: 20px; padding: 18px 16px 15px; color: #fff; text-align: start; min-height: 122px; display: flex; flex-direction: column; justify-content: space-between; }
+        .account-box { --a: #12795A; --b: #093A2D; position: relative; overflow: hidden; isolation: isolate; border-radius: 20px; padding: 18px 16px 15px; color: #fff; text-align: start; min-height: 122px; display: flex; flex-direction: column; justify-content: space-between;
+            background: repeating-radial-gradient(circle at 108% -12%, rgba(255,255,255,.10) 0 1px, transparent 1px 6px), repeating-radial-gradient(circle at -12% 112%, rgba(255,255,255,.07) 0 1px, transparent 1px 8px), linear-gradient(155deg, var(--a), var(--b)); }
         .account-box::before { content: ''; position: absolute; inset: 7px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 14px; z-index: -1; pointer-events: none; }
         .account-box::after { content: var(--cur-str); position: absolute; inset-inline-end: 10px; bottom: -16px; font-family: var(--display); font-size: 74px; font-weight: 700; line-height: 1; color: rgba(255, 255, 255, .08); z-index: -1; pointer-events: none; }
-        .cash-bg { background: repeating-radial-gradient(circle at 108% -12%, rgba(255,255,255,.10) 0 1px, transparent 1px 6px), repeating-radial-gradient(circle at -12% 112%, rgba(255,255,255,.07) 0 1px, transparent 1px 8px), linear-gradient(155deg, #12795A, #093A2D); }
-        .bank-bg { background: repeating-radial-gradient(circle at 108% -12%, rgba(255,255,255,.10) 0 1px, transparent 1px 6px), repeating-radial-gradient(circle at -12% 112%, rgba(255,255,255,.07) 0 1px, transparent 1px 8px), linear-gradient(155deg, #2F52A0, #162A56); }
-        .account-box h3 { font-size: 14px; font-weight: 600; opacity: .88; }
+        .acc-bg0 { --a: #12795A; --b: #093A2D; } .acc-bg1 { --a: #2F52A0; --b: #162A56; } .acc-bg2 { --a: #8A4FB0; --b: #44225E; }
+        .acc-bg3 { --a: #C2751F; --b: #6B3A0A; } .acc-bg4 { --a: #B8395B; --b: #5E1329; } .acc-bg5 { --a: #1E8A99; --b: #0B4551; }
+        .account-box h3 { font-size: 14px; font-weight: 600; opacity: .88; overflow-wrap: anywhere; }
+        .btn-manage-acc { width: 100%; padding: 11px; margin-bottom: 12px; background: var(--card-bg); border: 1.5px dashed var(--border-color); color: var(--primary); font-size: 13.5px; font-weight: 700; }
         .account-box .balance { font-size: clamp(19px, 5.6vw, 25px); font-weight: 700; font-variant-numeric: tabular-nums; word-break: break-word; line-height: 1.3; }
 
         .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -239,6 +241,12 @@
         .cat-add .modal-btn { flex: 0 0 auto; padding: 0 18px; }
         .cat-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 12px; margin: 8px 0; font-weight: 600; font-size: 14.5px; }
         .cat-row button { background: none; border: none; color: #BF3B2B; font-size: 20px; cursor: pointer; padding: 0 4px; }
+        .acc-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 12px; margin: 8px 0; }
+        .acc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .acc-name-input { width: 100%; border: 1.5px solid transparent; background: transparent; font-size: 15px; font-weight: 700; padding: 4px 6px; border-radius: 8px; outline: none; }
+        .acc-name-input:focus { border-color: var(--primary); background: var(--field); }
+        .acc-main small { color: var(--text-muted); font-size: 12px; padding-inline-start: 6px; font-variant-numeric: tabular-nums; }
+        .acc-add { margin-top: 14px; }
         .cat-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 14px 0; }
         .brand-links { margin-top: 12px; display: flex; justify-content: center; gap: 8px 16px; flex-wrap: wrap; }
         .link-btn { background: none; border: none; color: var(--primary); font-size: 12.5px; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 4px; }
@@ -293,10 +301,8 @@
     </div>
 
     <div class="hero">
-        <div class="accounts">
-            <div class="account-box cash-bg"><h3 data-i18n="cash">كاش</h3><div class="balance" id="cashBalance">0 ج.م</div></div>
-            <div class="account-box bank-bg"><h3 data-i18n="bank">بنك</h3><div class="balance" id="bankBalance">0 ج.م</div></div>
-        </div>
+        <div class="accounts" id="accountsGrid"></div>
+        <button class="btn-manage-acc" id="manageAccBtn" type="button" data-i18n="accountsBtn">⚙️ إدارة الحسابات</button>
         <div class="actions">
             <button class="btn-action btn-expense" id="openExpenseBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg><span data-i18n="expense">مصروف</span></button>
             <button class="btn-action btn-add" id="openIncomeBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7 7 17M16 17H7V8"/></svg><span data-i18n="income">دخل</span></button>
@@ -306,10 +312,7 @@
 
     <div class="card voice-section">
         <div class="voice-title" data-i18n="voiceTitle">سجّل بصوتك</div>
-        <select id="accountSelect" data-i18n-aria="account" aria-label="الحساب">
-            <option value="cash" data-i18n="accCash">حساب الكاش</option>
-            <option value="bank" data-i18n="accBank">حساب البنك</option>
-        </select>
+        <select id="accountSelect" data-i18n-aria="account" aria-label="الحساب"></select>
 
         <button class="mic-btn" id="micBtn" data-i18n-aria="micAria" aria-label="تسجيل صوتي">🎙️</button>
 
@@ -442,6 +445,23 @@
     </div>
 </div>
 
+<!-- إدارة الحسابات -->
+<div class="modal-overlay" id="modalAccounts">
+    <div class="modal-content">
+        <div class="modal-title" data-i18n="accountsTitle">الحسابات</div>
+        <div id="accList"></div>
+        <div class="cat-hint" data-i18n="accHint"></div>
+        <div class="acc-add">
+            <input type="text" id="accName" class="modal-input" maxlength="24" placeholder="اسم الحساب الجديد" data-i18n-ph="accNamePh" autocomplete="off">
+            <input type="number" id="accOpening" class="modal-input" inputmode="decimal" min="0" placeholder="الرصيد الافتتاحي (اختياري)" data-i18n-ph="accOpeningPh">
+            <button class="modal-btn modal-confirm" id="accAddBtn" type="button" style="width:100%" data-i18n="accAddBtn">إضافة حساب</button>
+        </div>
+        <div class="modal-btns" style="margin-top:10px">
+            <button class="modal-btn modal-cancel" data-close="modalAccounts" data-i18n="close">إغلاق</button>
+        </div>
+    </div>
+</div>
+
 <!-- إدارة التصنيفات -->
 <div class="modal-overlay" id="modalCats">
     <div class="modal-content">
@@ -497,10 +517,7 @@
 <div class="modal-overlay" id="modalTx">
     <div class="modal-content">
         <div class="modal-title" id="txTitle">إضافة مصروف</div>
-        <select id="txAccount" class="modal-select">
-            <option value="cash" data-i18n="accCashE">💵 حساب الكاش</option>
-            <option value="bank" data-i18n="accBankE">🏦 حساب البنك</option>
-        </select>
+        <select id="txAccount" class="modal-select"></select>
         <input type="number" id="txAmount" class="modal-input" inputmode="decimal" min="0" placeholder="المبلغ" data-i18n-ph="amount">
         <input type="text" id="txDesc" class="modal-input" maxlength="80" placeholder="الوصف (اختياري)" data-i18n-ph="descOpt">
         <select id="txCat" class="modal-select"></select>
@@ -517,13 +534,10 @@
 <div class="modal-overlay" id="modalTransfer">
     <div class="modal-content">
         <div class="modal-title" data-i18n="transferTitle">تحويل بين الحسابات</div>
-        <select id="transFrom" class="modal-select">
-            <option value="cash" data-i18n="fromCashE">من: 💵 حساب الكاش</option>
-            <option value="bank" data-i18n="fromBankE">من: 🏦 حساب البنك</option>
-        </select>
-        <select id="transTo" class="modal-select">
-            <option value="bank" data-i18n="toBankE">إلى: 🏦 حساب البنك</option>
-        </select>
+        <div class="modal-label" data-i18n="transFrom">التحويل من</div>
+        <select id="transFrom" class="modal-select"></select>
+        <div class="modal-label" data-i18n="transTo">التحويل إلى</div>
+        <select id="transTo" class="modal-select"></select>
         <input type="number" id="transAmount" class="modal-input" inputmode="decimal" min="0" placeholder="أدخل المبلغ هنا..." data-i18n-ph="transAmountPh">
         <div class="modal-btns">
             <button class="modal-btn modal-confirm" id="transConfirmBtn" data-i18n="transfer">تحويل</button>
@@ -539,6 +553,7 @@
         <input type="text" id="editDesc" class="modal-input" placeholder="الوصف" maxlength="80" data-i18n-ph="desc">
         <select id="editCat" class="modal-select"></select>
         <select id="editAccount" class="modal-select"></select>
+        <select id="editAccountTo" class="modal-select" style="display:none"></select>
         <input type="number" id="editAmount" class="modal-input" inputmode="decimal" min="0" placeholder="المبلغ" data-i18n-ph="amount">
         <div class="modal-label" data-i18n="dateTime">التاريخ والوقت</div>
         <input type="datetime-local" id="editDate" class="modal-input">
@@ -554,11 +569,7 @@
     <div class="modal-content">
         <div class="modal-title" id="goalModalTitle">إضافة للهدف</div>
         <input type="number" id="goalAmt" class="modal-input" inputmode="decimal" min="0" placeholder="المبلغ" data-i18n-ph="amount">
-        <select id="goalAcc" class="modal-select">
-            <option value="none" data-i18n="goalAccNone">بدون خصم من أي حساب</option>
-            <option value="cash" data-i18n="goalAccCash">اخصم من 💵 الكاش</option>
-            <option value="bank" data-i18n="goalAccBank">اخصم من 🏦 البنك</option>
-        </select>
+        <select id="goalAcc" class="modal-select"></select>
         <div class="modal-btns">
             <button class="modal-btn modal-confirm" id="goalConfirmBtn" data-i18n="add">إضافة</button>
             <button class="modal-btn modal-cancel" data-close="modalGoal" data-i18n="cancel">إلغاء</button>
@@ -577,10 +588,7 @@
         <input type="text" id="recDesc" class="modal-input" maxlength="80" placeholder="الوصف (مثال: إيجار)" data-i18n-ph="recDescPh">
         <input type="number" id="recAmount" class="modal-input" inputmode="decimal" min="0" placeholder="المبلغ" data-i18n-ph="amount">
         <select id="recCat" class="modal-select"></select>
-        <select id="recAcc" class="modal-select">
-            <option value="cash" data-i18n="accCashE">💵 حساب الكاش</option>
-            <option value="bank" data-i18n="accBankE">🏦 حساب البنك</option>
-        </select>
+        <select id="recAcc" class="modal-select"></select>
         <div class="modal-label" data-i18n="recDayLabel">يوم الشهر (من 1 إلى 28) — يبدأ من أقرب موعد قادم</div>
         <input type="number" id="recDay" class="modal-input" inputmode="numeric" min="1" max="28" value="1">
         <div class="modal-btns">
@@ -595,10 +603,7 @@
     <div class="modal-content">
         <div class="modal-title" id="bpTitle" data-i18n="bpTitleDefault">سجّله كمصروف؟</div>
         <input type="number" id="bpAmount" class="modal-input" inputmode="decimal" min="0" placeholder="السعر" data-i18n-ph="pricePh">
-        <select id="bpAcc" class="modal-select">
-            <option value="cash" data-i18n="accCashE">💵 حساب الكاش</option>
-            <option value="bank" data-i18n="accBankE">🏦 حساب البنك</option>
-        </select>
+        <select id="bpAcc" class="modal-select"></select>
         <select id="bpCat" class="modal-select"></select>
         <div class="modal-btns">
             <button class="modal-btn modal-confirm" id="bpConfirmBtn" data-i18n="record">تسجيل</button>
