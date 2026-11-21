@@ -503,14 +503,14 @@
         return s;
     }
 
-    function loadData() {
+    function loadData(skipUI) {
         try { const saved = safeGet(STORAGE_KEY); if (saved) state = normalizeState(JSON.parse(saved)); }
         catch (e) {
             console.error('Corrupted data', e);
             safeSet(STORAGE_KEY + '_corrupt_' + Date.now(), safeGet(STORAGE_KEY) || '');
             state = emptyState();
         }
-        updateUI();
+        if (!skipUI) updateUI();
     }
     let uiTimer = 0;
     function saveData(defer) {
@@ -581,11 +581,14 @@
 
     function updateUI() {
         renderAccounts(); fillAccountSelects();
-                buildPeriodSelect(); renderHistory(); renderSummary(); renderBasket(); renderBudgets(); renderGoals(); renderRecurring(); renderBackupInfo(); updateChart();
+                buildPeriodSelect(); renderHistory(true); renderSummary(); renderBasket(); renderBudgets(); renderGoals(); renderRecurring(); renderBackupInfo(); updateChart();
     }
 
     // ---------- السجل ----------
-    function renderHistory() {
+    const HISTORY_PAGE = 50;
+    let historyLimit = HISTORY_PAGE;
+    function renderHistory(keepLimit) {
+        if (keepLimit !== true) historyLimit = HISTORY_PAGE; // أي فلتر/بحث جديد يرجّع لأول صفحة
         const list = $('historyList');
         list.innerHTML = '';
         const q = $('searchBox').value.trim().toLowerCase();
@@ -594,7 +597,8 @@
             .filter(({ t }) => (ft === 'all' || t.type === ft) && (!q || (t.description + ' ' + t.category + ' ' + catLabel(t.category) + ' ' + txAccLabel(t)).toLowerCase().includes(q)))
             .sort((a, b) => (b.t.ts - a.t.ts) || (b.i - a.i)).map((x) => x.t);
         if (!txs.length) { list.appendChild(el('li', { class: 'empty-msg', text: q || ft !== 'all' ? T('noMatches') : T('noTx') })); return; }
-        txs.forEach((t) => {
+        const shown = txs.slice(0, historyLimit);
+        shown.forEach((t) => {
             let icon = '🛍️', sign = '-', color = 'var(--danger)';
             if (t.type === 'income') { icon = '💰'; sign = '+'; color = 'var(--primary)'; }
             if (t.type === 'transfer') { icon = '🔄'; sign = ''; color = 'var(--info)'; }
@@ -610,6 +614,11 @@
             ]);
             list.appendChild(el('li', { class: 'history-item ' + t.type }, [info, side]));
         });
+        if (txs.length > shown.length) {
+            const more = el('button', { type: 'button', class: 'btn-backup history-more', text: T('showMore', Math.min(HISTORY_PAGE, txs.length - shown.length), txs.length - shown.length) });
+            more.addEventListener('click', () => { historyLimit += HISTORY_PAGE; renderHistory(true); });
+            list.appendChild(el('li', { class: 'history-more-row' }, [more]));
+        }
     }
 
     function deleteTransaction(id) {
@@ -1579,7 +1588,7 @@
 
     // ---------- التشغيل ----------
     updatePinButtons();
-    loadData();
+    loadData(true); // الرسم بيحصل مرة واحدة جوه refreshLang (بدل مرتين)
     refreshLang();
     processRecurring();
     requestPersistence();
