@@ -84,9 +84,11 @@
 
 - **لا ترفع** أي نسخة احتياطية (`wallet_backup*.json`) أو ملف CSV على المستودع ده.
   *Never commit any backup (`wallet_backup*.json`) or CSV file to this repository.*
-- عند أي تعديل: غيّر رقم `CACHE_NAME` في `sw.js` ثم `git add . && git commit -m "update" && git push`.
-  *After any change, bump `CACHE_NAME` in `sw.js`, then `git add . && git commit -m "update" && git push`.*
-- **النشر على GitHub Pages / Deploying:** Settings ← Pages ← Source: *Deploy from a branch* ← `main` / `(root)`. الرابط: `https://USERNAME.github.io/REPO/` (كل المسارات نسبية فتشتغل داخل أي مسار فرعي). ملف `.gitignore` بيمنع رفع النسخ الاحتياطية وملفات CSV، و`.nojekyll` بيخلي GitHub يخدم الملفات كما هي.
+- عند أي تعديل: `git add . && git commit -m "update" && git push` وبس. رقم الإصدار (`__BUILD__` في `sw.js`) بيتحدّث تلقائيًا من بصمة الملفات عن طريق `.github/workflows/pages.yml`، وشريط "تحديث الآن" بيظهر للمستخدمين.
+  *After any change just `git add . && git commit -m "update" && git push`. The cache version (`__BUILD__` in `sw.js`) is stamped automatically from a hash of the app files by `.github/workflows/pages.yml`.*
+- **النشر على GitHub Pages / Deploying:** Settings ← Pages ← Source: **GitHub Actions** (الـ workflow الموجود في `.github/workflows/pages.yml` بينشر الموقع). الرابط: `https://USERNAME.github.io/REPO/` (كل المسارات نسبية فتشتغل داخل أي مسار فرعي). ملف `.gitignore` بيمنع رفع النسخ الاحتياطية وملفات CSV، و`.nojekyll` بيخلي GitHub يخدم الملفات كما هي.
+- **الخطوط:** محلية داخل فولدر `fonts/` (Cairo بالأوزان 400/500/600/700 وReem Kufi 500/700 بصيغة TTF، ترخيص OFL). لو غيّرت أو أضفت خط، حدّث قائمة `CORE` في `sw.js`.
+  *Fonts are bundled in `fonts/` (TTF, OFL license). If you change them, update `CORE` in `sw.js`.*
 - الملفات: `index.html` (الواجهة)، `app.js` (المنطق)، `i18n.js` (قاموس الترجمة عربي/English)، `sw.js` (العمل بدون إنترنت)، `manifest.json`.
   *Files: `index.html` (UI), `app.js` (logic), `i18n.js` (Arabic/English dictionary), `sw.js` (offline), `manifest.json`.*
 - لإضافة أو تعديل نص في الواجهة: عدّل المفتاح في `i18n.js` (قسم `ar` وقسم `en`). التصنيفات بتتخزن بالعربي داخليًا عشان النسخ الاحتياطية القديمة تفضل شغالة.

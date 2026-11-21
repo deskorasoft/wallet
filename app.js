@@ -241,15 +241,22 @@
     const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
     // ---------- الوضع الليلي ----------
+    const THEMES = ['light', 'dark'];
+    const THEME_ICON = { light: '🌙', dark: '☀️' }; // الأيقونة بتوضّح الوضع اللي هيجي بعد الضغط
+    const THEME_COLOR = { light: '#12795A', dark: '#0C1513' };
     const themeBtn = $('themeBtn');
-    const currentTheme = safeGet('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', currentTheme);
-    themeBtn.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+    function applyTheme(t) {
+        if (!THEMES.includes(t)) t = 'light';
+        document.documentElement.setAttribute('data-theme', t);
+        themeBtn.textContent = THEME_ICON[t];
+        const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', THEME_COLOR[t]);
+        return t;
+    }
+    applyTheme(safeGet('theme') || 'light');
     themeBtn.addEventListener('click', () => {
-        const nt = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', nt);
+        const cur = document.documentElement.getAttribute('data-theme');
+        const nt = applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
         safeSet('theme', nt);
-        themeBtn.textContent = nt === 'dark' ? '☀️' : '🌙';
         updateChart();
     });
 
@@ -537,7 +544,9 @@
         return OTHER_CAT;
     }
     // كلمات مصرية إضافية للتصنيف التلقائي (بتتطابق بعد توحيد الهمزات والتاء المربوطة)
-    const mkS = (s) => new Set(s.split(/\s+/).map(nw));
+    const nz = (w) => nw(String(w).toLowerCase());
+    const mkSet = (arr) => new Set(arr.map(nz));
+    const mkS = (s) => mkSet(s.split(/\s+/));
     const EGY_CATS = [
         [0, mkS('فطار غدا عشا عشاء سندوتش ساندوتش فول طعميه فلافل كشري شاورما حلويات حلو بقاله مكرونه رز سمك بيض فراخ دليفري ديليفري كافيه نسكافيه بيبسي كولا مياه خبز فاكهه موز تفاح برتقال بطاطس طماطم')],
         [1, mkS('توكتوك اجره تذكره موقف سواق سايق سولار موتوسيكل جراج سكوتر')],
@@ -898,8 +907,8 @@
         });
         const txtColor = getComputedStyle(document.body).color;
         ctx.fillStyle = txtColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = '500 11px "IBM Plex Sans Arabic", sans-serif'; ctx.globalAlpha = 0.7; ctx.fillText(T('chartTotal'), c, c - 12);
-        ctx.globalAlpha = 1; ctx.font = '700 16px "IBM Plex Sans Arabic", sans-serif'; ctx.fillText(fmt(total), c, c + 8);
+        ctx.font = '500 11px "Cairo", sans-serif'; ctx.globalAlpha = 0.7; ctx.fillText(T('chartTotal'), c, c - 12);
+        ctx.globalAlpha = 1; ctx.font = '700 16px "Cairo", sans-serif'; ctx.fillText(fmt(total), c, c + 8);
         entries.forEach(([k, v], i) => legend.appendChild(el('div', { class: 'legend-item' }, [
             el('span', { class: 'dot', style: 'background:' + COLORS[i % COLORS.length] }), el('span', { class: 'lg-name', text: catLabel(k) }),
             el('span', { class: 'lg-val', text: fmt(v) + ' (' + Math.round(v / total * 100) + '%)' })
@@ -1232,8 +1241,6 @@
 
     // ---------- تنفيذ الأوامر الصوتية/المكتوبة ----------
     // مطابقة بالجذر: بتشيل التشكيل والهمزات و"ال" والواو والضمائر الملتصقة (جبتلي، اشتريته، مرتبي، المرتب، جالي، جاني…)
-    const nz = (w) => nw(String(w).toLowerCase());
-    const mkSet = (arr) => new Set(arr.map(nz));
     const SUF_RE = /(?:لي|لنا|ني|نا|لك|ها|ه|ك|ي)$/;
     function stemHit(w, set) {
         const n = nz(w); if (!n) return false;
@@ -1557,6 +1564,7 @@
     I18N.onChange(refreshLang);
 
     // ---------- إشعار التحديث ----------
+    let wantReload = false;
     function showUpdateBanner(worker) {
         if ($('updateBanner')) return;
         const bar = document.createElement('div'); bar.id = 'updateBanner'; bar.setAttribute('role', 'status');
@@ -1565,7 +1573,7 @@
         const btns = document.createElement('span'); btns.style.cssText = 'display:flex;gap:8px';
         const mk = (label, primary, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.style.cssText = 'border:0;border-radius:10px;padding:8px 14px;font:inherit;cursor:pointer;' + (primary ? 'background:#fff;color:#12795A' : 'background:rgba(255,255,255,.18);color:#fff'); b.addEventListener('click', fn); return b; };
         btns.appendChild(mk(T('updLater'), false, () => bar.remove()));
-        btns.appendChild(mk(T('updNow'), true, () => { window.__wantReload = true; try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (e) { location.reload(); } setTimeout(() => location.reload(), 3000); }));
+        btns.appendChild(mk(T('updNow'), true, () => { wantReload = true; try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (e) { location.reload(); } setTimeout(() => location.reload(), 3000); }));
         bar.appendChild(msg); bar.appendChild(btns); document.body.appendChild(bar);
     }
 
@@ -1578,7 +1586,7 @@
     if (pinData) lockApp();
     else if (safeGet(ONBOARD_KEY) !== '1') { safeSet(ONBOARD_KEY, '1'); openModal('modalWelcome'); }
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-        navigator.serviceWorker.addEventListener('controllerchange', () => { if (window.__wantReload) location.reload(); });
+        navigator.serviceWorker.addEventListener('controllerchange', () => { if (wantReload) location.reload(); });
         navigator.serviceWorker.register('sw.js').then((reg) => {
             const offer = (w) => { if (navigator.serviceWorker.controller) showUpdateBanner(w); };
             const track = (w) => { if (!w) return; if (w.state === 'installed') return offer(w); w.addEventListener('statechange', () => { if (w.state === 'installed') offer(w); }); };

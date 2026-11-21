@@ -2,15 +2,12 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; font-src 'self' file:; img-src 'self' file: data: blob:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>محفظتي الذكية — Deskora</title>
     <meta name="description" content="محفظتي الذكية من Deskora — تتبع مصاريفك ودخلك بالصوت | My Smart Wallet by Deskora — voice-first expense tracker">
     <meta name="author" content="Deskora">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;700&display=swap" rel="stylesheet">
 
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon-192.png">
@@ -18,9 +15,16 @@
     <meta name="theme-color" content="#12795A">
 
     <style>
+        /* خطوط محلية من فولدر fonts/ (بتشتغل بدون إنترنت) */
+        @font-face { font-family: 'Cairo'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/Cairo-Regular.ttf') format('truetype'); }
+        @font-face { font-family: 'Cairo'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/Cairo-Medium.ttf') format('truetype'); }
+        @font-face { font-family: 'Cairo'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/Cairo-SemiBold.ttf') format('truetype'); }
+        @font-face { font-family: 'Cairo'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/Cairo-Bold.ttf') format('truetype'); }
+        @font-face { font-family: 'Reem Kufi'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/ReemKufi-Medium.ttf') format('truetype'); }
+        @font-face { font-family: 'Reem Kufi'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/ReemKufi-Bold.ttf') format('truetype'); }
         :root {
-            --font: 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif;
-            --display: 'Reem Kufi', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+            --font: 'Cairo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            --display: 'Reem Kufi', 'Cairo', system-ui, sans-serif;
             --bg-color: #EDF1EF; --card-bg: #FFFFFF; --field: #F4F7F6;
             --text-main: #142320; --text-muted: #667874; --border-color: #DCE4E1;
             --primary: #12795A; --danger: #BF3B2B; --info: #2F6BDB; --warn: #C98A1B;
@@ -225,7 +229,7 @@
     
         /* دعم الإنجليزية (LTR) / English (LTR) support */
         html[lang="en"] { --cur-str: 'EGP'; }
-        html[lang="en"] body { --font: 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        html[lang="en"] body { --font: 'Cairo', system-ui, -apple-system, 'Segoe UI', sans-serif; }
         html[dir="ltr"] select { background-position: right 12px center; }
         html[dir="ltr"] .app-title { letter-spacing: .2px; }
         .header-actions { display: flex; gap: 8px; align-items: center; }

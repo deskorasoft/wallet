@@ -1,5 +1,5 @@
-// غيّر رقم الإصدار عند كل تحديث للتطبيق
-const CACHE_NAME = 'wallet-gh-v10';
+// رقم الإصدار بيتحط تلقائياً عند النشر (GitHub Actions بيستبدل __BUILD__ ببصمة الملفات). ما تعدّلوش يدوياً.
+const CACHE_NAME = 'wallet-__BUILD__';
 const CORE = [
   './',
   './index.html',
@@ -7,17 +7,22 @@ const CORE = [
   './i18n.js',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './fonts/Cairo-Regular.ttf',
+  './fonts/Cairo-Medium.ttf',
+  './fonts/Cairo-SemiBold.ttf',
+  './fonts/Cairo-Bold.ttf',
+  './fonts/ReemKufi-Medium.ttf',
+  './fonts/ReemKufi-Bold.ttf'
 ];
-const EXTERNAL = [
-  'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;700&display=swap'
-];
+const EXTERNAL = [];
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     // كل ملف لوحده: فشل ملف واحد ما يوقفش التثبيت كله
-    await Promise.allSettled([...CORE, ...EXTERNAL].map((url) => cache.add(url)));
+    // cache:'reload' عشان نجيب أحدث نسخة فعلاً (مش نسخة قديمة من كاش المتصفح)
+    await Promise.allSettled([...CORE.map((url) => cache.add(new Request(url, { cache: 'reload' }))), ...EXTERNAL.map((url) => cache.add(url))]);
     // أول تثبيت: فعّل فوراً. تحديث: استنى لحد ما المستخدم يضغط "تحديث الآن" (بيبعت SKIP_WAITING)
     if (!self.registration.active) self.skipWaiting();
   })());
@@ -35,15 +40,18 @@ self.addEventListener('activate', (e) => {
   })());
 });
 
-// ملفات الموقع نفسه: الشبكة أولاً (عشان GitHub Pages بيحتفظ بالملفات دقايق)، ثم الكاش لو أوفلاين
-async function networkFirst(req) {
+// ملفات الموقع نفسه: من الكاش فوراً (التطبيق بيفتح في أقل من ثانية حتى لو النت بطيء أو مقطوع).
+// التحديثات بتوصل لما تغيّر CACHE_NAME: النسخة الجديدة بتتحمّل في الخلفية وبيظهر شريط "تحديث الآن".
+async function cacheFirst(req) {
   const cache = await caches.open(CACHE_NAME);
+  const hit = await cache.match(req, { ignoreSearch: true });
+  if (hit) return hit;
   try {
     const fresh = await fetch(req);
     if (fresh.ok) cache.put(req, fresh.clone()); // نخزّن الردود السليمة فقط (مش 404)
     return fresh;
   } catch (err) {
-    return (await cache.match(req)) || (req.mode === 'navigate' ? ((await cache.match('./index.html')) || (await cache.match('./'))) : null) || Response.error();
+    return (req.mode === 'navigate' ? ((await cache.match('./index.html')) || (await cache.match('./'))) : null) || Response.error();
   }
 }
 
@@ -62,5 +70,5 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const sameOrigin = new URL(req.url).origin === self.location.origin;
-  e.respondWith(sameOrigin ? networkFirst(req) : staleWhileRevalidate(req));
+  e.respondWith(sameOrigin ? cacheFirst(req) : staleWhileRevalidate(req));
 });
